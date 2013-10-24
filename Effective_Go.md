@@ -10,7 +10,7 @@
     - [Interface names](#interface names)
     - [MixedCaps](#mixedCaps)
 - [Semicolons](#semicolons)
-- [Control structures](#control structures)
+- [Control structures](#control-structures)
     - [If](#if)
     - [Redeclaration and reassignment](#redeclaration and reassignment)
     - [For](#for)
