@@ -1,7 +1,7 @@
 #Effective Go
 
-- Introduction
-    Examples
+- [Introduction](#introduction)
+    - Examples
 - Formatting
 - Commentary
 - Names
