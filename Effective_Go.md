@@ -1,64 +1,64 @@
 #Effective Go
 
 - [Introduction](#introduction)
-    - Examples
-- Formatting
-- Commentary
-- Names
-    - Package names
-    - Getters
-    - Interface names
-    - MixedCaps
-- Semicolons
-- Control structures
-    - If
-    - Redeclaration and reassignment
-    - For
-    - Switch
--Type switch
--Functions
-    - Multiple return values
-    - Named result parameters
-    - Defer
--Data
-    - Allocation with new
-    - Constructors and composite literals
-    - Allocation with make
-    - Arrays
-    - Slices
-    - Two-dimensional slices
-    - Maps
-    - Printing
-    - Append
-- Initialization
-    - Constants
-    - Variables
-    - The init function
-- Methods
-    - Pointers vs. Values
-- Interfaces and other types
-    - Interfaces
-    - Conversions
-    - Interface conversions and type assertions
-    - Generality
-    - Interfaces and methods
-- The blank identifier
-    - The blank identifier in multiple assignment
-    - Unused imports and variables
-    - Import for side effect
-    - Interface checks
-- Embedding
-- Concurrency
-    - Share by communicating
-    - Goroutines
-    - Channels
-    - Channels of channels
-    - Parallelization
-    - A leaky buffer
-- Errors
-    - Panic
-    - Recover
-- A web server
+    - Examples(#Examples)
+- Formatting(#Formatting)
+- Commentary(#Commentary)
+- Names(#Names)
+    - Package names(#Package names)
+    - Getters(#Getters)
+    - Interface names(#Interface names)
+    - MixedCaps(#MixedCaps)
+- Semicolons(#Semicolons)
+- Control structures(#Control structures)
+    - If(#If)
+    - Redeclaration and reassignment(#Redeclaration and reassignment)
+    - For(#For)
+    - Switch(#Switch)
+-Type switch(#Type switch)
+-Functions(#Functions)
+    - Multiple return values(#Multiple return values)
+    - Named result parameters(#Named result parameters)
+    - Defer(#Defer)
+-Data(#Data)
+    - Allocation with new(#Allocation with new)
+    - Constructors and composite literals(#Constructors and composite literals)
+    - Allocation with make(#Allocation with make)
+    - Arrays(#Arrays)
+    - Slices(#Slices)
+    - Two-dimensional slices(#Two-dimensional slices)
+    - Maps(#Maps)
+    - Printing(#Printing)
+    - Append(#Append)
+- Initialization(#Initialization)
+    - Constants(#Constants)
+    - Variables(#Variables)
+    - The init function(#The init function)
+- Methods(#Methods)
+    - Pointers vs. Values(#Pointers vs. Values)
+- Interfaces and other types(#Interfaces and other types)
+    - Interfaces(#Interfaces)
+    - Conversions(#Conversions)
+    - Interface conversions and type assertions(#Interface conversions and type assertions)
+    - Generality(#Generality)
+    - Interfaces and methods(#Interfaces and methods)
+- The blank identifier(#The blank identifier)
+    - The blank identifier in multiple assignment(#The blank identifier in multiple assignment)
+    - Unused imports and variables(#Unused imports and variables)
+    - Import for side effect(#Import for side effect)
+    - Interface checks(#Interface checks)
+- Embedding(#Embedding)
+- Concurrency(#Concurrency)
+    - Share by communicating(#Share by communicating)
+    - Goroutines(#Goroutines)
+    - Channels(#Channels)
+    - Channels of channels(#Channels of channels)
+    - Parallelization(#Parallelization)
+    - A leaky buffer(#A leaky buffer)
+- Errors(#Errors)
+    - Panic(#Panic)
+    - Recover(#Recove)
+- A web server(#A web server)
 
 ---
 
