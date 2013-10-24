@@ -35,7 +35,7 @@
     - [Variables](#variables)
     - [The init function](#the-init-function)
 - [Methods](#methods)
-    - [Pointers vs. Values](#pointers-vs.-Values)
+    - [Pointers vs. Values](#pointers-vs-values)
 - [Interfaces and other types](#interfaces-and-other-types)
     - [Interfaces](#interfaces)
     - [Conversions](#conversions)
