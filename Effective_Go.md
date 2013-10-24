@@ -20,7 +20,7 @@
     - [Multiple return values](#Multiple return values)
     - [Named result parameters](#Named result parameters)
     - [Defer](#Defer)
--[Data(#Data)
+-[Data](#Data)
     - [Allocation with new](#Allocation with new)
     - [Constructors and composite literals](#Constructors and composite literals)
     - [Allocation with make](#Allocation with make)
