@@ -48,13 +48,13 @@
     - [Import for side effect](#import-for-side-effect)
     - [Interface checks](#interface-checks)
 - [Embedding](#embedding)
-- [Concurrency](#concurrency)
-    - [Share by communicating](#share-by-communicating)
+- [共時性 (Concurrency)](#concurrency)
+    - [以通訊實現資料共享](#share-by-communicating)
     - [Goroutines](#goroutines)
     - [Channels](#channels)
-    - [Channels of channels](#channels-of-channels)
-    - [Parallelization](#parallelization)
-    - [A leaky buffer](#a-leaky-buffer)
+    - [用 channel 傳遞 channel](#channels-of-channels)
+    - [平行處理 (Parallelization)](#parallelization)
+    - [不會滿溢的緩衝區](#a-leaky-buffer)
 - [Errors](#errors)
     - [Panic](#panic)
     - [Recover](#recove)
@@ -1508,262 +1508,297 @@ Embedding types introduces the problem of name conflicts but the rules to resolv
 
 Second, if the same name appears at the same nesting level, it is usually an error; it would be erroneous to embed log.Logger if the Job struct contained another field or method called Logger. However, if the duplicate name is never mentioned in the program outside the type definition, it is OK. This qualification provides some protection against changes made to types embedded from outside; there is no problem if a field is added that conflicts with another field in another subtype if neither field is ever used.
 
-##Concurrency
-###Share by communicating
+##<a name="concurrency"></a>共時性 (Concurrency)
+###<a name="share-by-communicating"></a>以通訊實現資料共享
 
-Concurrent programming is a large topic and there is space only for some Go-specific highlights here.
+Concurrent programming 是個非常值得探討的議題，對此，Go 也有一些需要專門提出來討論的部份。
 
-Concurrent programming in many environments is made difficult by the subtleties required to implement correct access to shared variables. Go encourages a different approach in which shared values are passed around on channels and, in fact, never actively shared by separate threads of execution. Only one goroutine has access to the value at any given time. Data races cannot occur, by design. To encourage this way of thinking we have reduced it to a slogan:
+共時環境中共享變數內容需要一些精妙的技巧來保證其正確性，使得共時編程在許多情況下並不容易。在 Go 的生態裡，我們鼓勵另外一種做法ㄧㄧ利用 channel 來傳遞需要共享的值，並避免讓多個執行緒頻繁地共享資源；無時無刻只讓單一 goroutine 有權存取特定變數，籍以避免資料競態 (data race)。為了宣揚此類理念，我們有個簡單的口號：
 
-Do not communicate by sharing memory; instead, share memory by communicating. 
+以溝通實現共享，而非以共享實現溝通。
 
-This approach can be taken too far. Reference counts may be best done by putting a mutex around an integer variable, for instance. But as a high-level approach, using channels to control access makes it easier to write clear, correct programs.
+當然，這樣的做法並非此類問題唯一或最簡單的解決方向，例如，在同步鎖 (mutex) 保護下的參照計數 (reference count) 一樣可以在多執行緒之間維持資料正確性。但以高階程式語言的設計觀點，利用 channel 來控制資料分享是更淺顯且不易出錯的方案。
 
-One way to think about this model is to consider a typical single-threaded program running on one CPU. It has no need for synchronization primitives. Now run another such instance; it too needs no synchronization. Now let those two communicate; if the communication is the synchronizer, there's still no need for other synchronization. Unix pipelines, for example, fit this model perfectly. Although Go's approach to concurrency originates in Hoare's Communicating Sequential Processes (CSP), it can also be seen as a type-safe generalization of Unix pipes.
+對於這種設計思維，這邊有一種簡單的理解方式。設想一支在單核心處理器上執行的典型的單執行緒程式，以它的架構當然毋需考慮任何資料同步問題；現在把兩個這樣的架構並聯在一起，因為各別仍是獨立的單一執行緒，所以仍不需考慮同步。接著，我們讓這兩個執行緒進行通訊；如果通訊機制本身已經針對資料同步問題特別設計過，那麼整體而言仍不需對架構作出任何修改。UNIX pipe 正式此類設計的一種體現。雖然 Go 在這方面是基於 Hoare 提出的 Communicating Sequential Processes (CSP) 而設計，我們仍然可以把 channel 視為是一種型別安全的 UNIX pipe 延伸產物。
 
-###Goroutines
+###<a name="goroutines"></a>Goroutines
 
-They're called goroutines because the existing terms—threads, coroutines, processes, and so on—convey inaccurate connotations. A goroutine has a simple model: it is a function executing concurrently with other goroutines in the same address space. It is lightweight, costing little more than the allocation of stack space. And the stacks start small, so they are cheap, and grow by allocating (and freeing) heap storage as required.
+之所以提出 *goroutine* 這個特殊名詞，是因為它並非單單只是傳統概念上的執行緒、coroutine、甚至 process。一個 goroutine 只是一個單純的模型：一個函式與其它 goroutine 同時在同一個記憶體空間內執行。它非常輕量，用到的記憶體只比 call stack 多一點點；而 call stack 本身並不大，所以整體而言創造 goroutine 沒什麼成本，只隨著執行需求動態地增減所用到的 heap 空間。
 
-Goroutines are multiplexed onto multiple OS threads so if one should block, such as while waiting for I/O, others continue to run. Their design hides many of the complexities of thread creation and management.
+多個 goroutine 會在多個作業系統執行緒上同時運作，所以假若某個 goroutine 因為等待系統 I/O 之類的理由而被阻塞，其它的 goroutine 會繼續執行不受其影響。其實作在台面下其實隱藏許多複雜的執行緒管理機制。
 
-Prefix a function or method call with the go keyword to run the call in a new goroutine. When the call completes, the goroutine exits, silently. (The effect is similar to the Unix shell's & notation for running a command in the background.)
+如果在函式調用時在前面加上 `go` 這個關鍵字，那麼這個調用就會被放到一個新的 goroutine 上執行。隨著該函式返回，goroutine 也會無聲無息地隨之結束。（這就好比 UNIX shell 裡面，如果在一行指令最後加上 `&` 符號，那麼這行指令會靜靜地在背景執行）
 
-    go list.Sort()  // run list.Sort concurrently; don't wait for it.
+```go
+go list.Sort()  // 共時化調用 list.Sort；我們不會在此等待其執行結果
+```
 
-A function literal can be handy in a goroutine invocation.
+匿名函式有時會讓我們能更方便地使用 goroutine。
 
-    func Announce(message string, delay time.Duration) {
-        go func() {
-            time.Sleep(delay)
-            fmt.Println(message)
-        }()  // Note the parentheses - must call the function.
-    }
-
-In Go, function literals are closures: the implementation makes sure the variables referred to by the function survive as long as they are active.
-
-These examples aren't too practical because the functions have no way of signaling completion. For that, we need channels.
-
-###Channels
-
-Like maps, channels are allocated with make, and the resulting value acts as a reference to an underlying data structure. If an optional integer parameter is provided, it sets the buffer size for the channel. The default is zero, for an unbuffered or synchronous channel.
-
-    ci := make(chan int)            // unbuffered channel of integers
-    cj := make(chan int, 0)         // unbuffered channel of integers
-    cs := make(chan *os.File, 100)  // buffered channel of pointers to Files
-
-Unbuffered channels combine communication—the exchange of a value—with synchronization—guaranteeing that two calculations (goroutines) are in a known state.
-
-There are lots of nice idioms using channels. Here's one to get us started. In the previous section we launched a sort in the background. A channel can allow the launching goroutine to wait for the sort to complete.
-
-    c := make(chan int)  // Allocate a channel.
-    // Start the sort in a goroutine; when it completes, signal on the channel.
+```go
+func Announce(message string, delay time.Duration) {
     go func() {
-        list.Sort()
-        c <- 1  // Send a signal; value does not matter.
-    }()
-    doSomethingForAWhile()
-    <-c   // Wait for sort to finish; discard sent value.
+        time.Sleep(delay)
+        fmt.Println(message)
+    }()  // 注意這些圓括號ㄧㄧ這邊必須要進行函式調用
+}
+```
 
-Receivers always block until there is data to receive. If the channel is unbuffered, the sender blocks until the receiver has received the value. If the channel has a buffer, the sender blocks only until the value has been copied to the buffer; if the buffer is full, this means waiting until some receiver has retrieved a value.
+在 Go 的世界裡，匿名函式本身是一種閉包 (closure)：所有在此函式所能存取的變數壽命將持續到函式結束為止。
 
-A buffered channel can be used like a semaphore, for instance to limit throughput. In this example, incoming requests are passed to handle, which receives a value from the channel, processes the request, and then sends a value back to the channel to ready the "semaphore" for the next consumer. The capacity of the channel buffer limits the number of simultaneous calls to process, so during initialization we prime the channel by filling it to capacity.
+以上範例其實不太實用，因為我們無法得知函式何時結束。為了做到這點，我們需要 channel。
 
-    var sem = make(chan int, MaxOutstanding)
+###<a name="channels"></a>Channels
 
-    func handle(r *Request) {
-        <-sem          // Wait for active queue to drain.
-        process(r)     // May take a long time.
-        sem <- 1       // Done; enable next request to run.
+一如 map，我們利用 `make` 創建 channel，且這些 channel 的行為與那些底層另有實體資料的參照型別相近（譯註：例如 slice 底層另有 array，可視為 array 的參照）。在利用 `make` 創建 channel 時有一個選填的整數參數，用以指定 channel 的緩衝區大小，預設為零，意指無緩衝的同步式 channel。
+
+```go
+ci := make(chan int)            // 無緩衝區的整數 channel
+cj := make(chan int, 0)         // 同上，無緩衝區的整數 channel
+cs := make(chan *os.File, 100)  // 有緩衝區的 channel，用以傳遞 *os.File
+```
+
+無緩衝的 channel 會把通訊內容，也就是用以傳遞的值，與同步機制結合在一起，如此便可保證兩個 goroutine 之間能在確定彼此的狀態的情況下交換資訊。
+
+channel 能使得我們的程式更為簡潔優雅。讓我們回顧一下前面在背景計算排序的例子。如果在此使用 channel，則可籍此得知各分枝出去的 goroutine 執行狀態，進而在必要時等待其執行完成。
+
+```go
+c := make(chan int)  // 創建一個 channel
+// 發起一個 goroutine，在其上進行排序計算。當計算完成時，透過 channel 通知我們。
+go func() {
+    list.Sort()
+    c <- 1  // 發出結束訊號。其實際值為何無關緊要。
+}()
+doSomethingForAWhile()
+<-c   // 等待排序完成；不理會實際收到的值。
+```
+
+channel 的接收端會在有東西能讓它接收之前會一直被阻塞。如果是無緩衝區的 channel，則發送端在有接收端就緒之前也會被卡住。如果 channel 有緩衝區，則發送端只須等待寄送內容被複製進緩衝區即可；但若緩衝區滿了，則發送端仍須等到有接收端先來把一些值收走。
+
+一個有緩衝的 channel 可以當作號誌使用，例如用以作為流量控制的手段。在以下的例子裡，接收進來的請求都會被丟到 `handle` 裡處理，每個 `handle` 從 channel 裡面取值，處理請求內容，並在完成後把一個值塞回 channel，表示現在準備處理下一個請求。在此例中 channel 的緩衝區大小就相當於同時運行的 `process` 數量上限，因此在初始化這個 channel 的時候必須先把它的緩衝區填滿。
+
+```go
+var sem = make(chan int, MaxOutstanding)
+
+func handle(r *Request) {
+    <-sem          // 等待取得執行權
+    process(r)     // 處理請求。可能花上一點時間
+    sem <- 1       // 處理完成；準備處理下一份請求
+}
+
+func init() {
+    for i := 0; i < MaxOutstanding; i++ {
+        sem <- 1
     }
+}
 
-    func init() {
-        for i := 0; i < MaxOutstanding; i++ {
+func Serve(queue chan *Request) {
+    for {
+        req := <-queue
+        go handle(req)  // 不在此等待 handle 執行完成
+    }
+}
+```
+
+在此，因為從 channel 取得資料才可能發生資料同步問題（意即，送出「在」接收「之前」；請參考《[The Go Memory Model](http://golang.org/ref/mem)》一文），所以必須在接收資料的時候取得執行權，而非在送出時取得。
+
+前述設計仍有一個問題。雖然 `MaxOutstanding` 限制了同時運行的數量，但 `Serve` 每收到一個請求就會產生一個 goroutine；若請求發生的速度夠快，這個程式仍有可能無限制地消耗系統資源。
+
+```go
+func Serve(queue chan *Request) {
+    for req := range queue {
+        <-sem
+        go func() {
+            process(req) // 仍有漏洞。等等我們會解釋
             sem <- 1
-        }
+        }()
     }
+}
+```
 
-    func Serve(queue chan *Request) {
-        for {
-            req := <-queue
-            go handle(req)  // Don't wait for handle to finish.
-        }
+上面這個例子的問題在於，在 Go 的 `for` 迴圈中，迭代變數在每輪迭代中被複用，所以 `req` 變數被每個 goroutine 所共享。我們必須在此保證每個 goroutine 使用各別的 `req`，因此下例中便把 `req` 作為參數帶入閉包中：
+
+```go
+func Serve(queue chan *Request) {
+    for req := range queue {
+        <-sem
+        go func(req *Request) {
+            process(req)
+            sem <- 1
+        }(req)
     }
+}
+```
 
-Because data synchronization occurs on a receive from a channel (that is, the send "happens before" the receive; see The Go Memory Model), acquisition of the semaphore must be on a channel receive, not a send.
+請比較一下以上幾個版本中閉包宣告與執行方式的差異；以下是另一種解決方式，此例子在每次迭代裡創建同名但全新的變數：
 
-This design has a problem, though: Serve creates a new goroutine for every incoming request, even though only MaxOutstanding of them can run at any moment. As a result, the program can consume unlimited resources if the requests come in too fast. We can address that deficiency by changing Serve to gate the creation of the goroutines. Here's an obvious solution, but beware it has a bug we'll fix subsequently:
-
-    func Serve(queue chan *Request) {
-        for req := range queue {
-            <-sem
-            go func() {
-                process(req) // Buggy; see explanation below.
-                sem <- 1
-            }()
-        }
+```go
+func Serve(queue chan *Request) {
+    for req := range queue {
+        <-sem
+        req := req // 為每一個 goroutine 創建全新的 req
+        go func() {
+            process(req)
+            sem <- 1
+        }()
     }
+}
+```
 
-The bug is that in a Go for loop, the loop variable is reused for each iteration, so the req variable is shared across all goroutines. That's not what we want. We need to make sure that req is unique for each goroutine. Here's one way to do that, passing the value of req as an argument to the closure in the goroutine:
+這種寫法可能看起來很奇怪：
 
-    func Serve(queue chan *Request) {
-        for req := range queue {
-            <-sem
-            go func(req *Request) {
-                process(req)
-                sem <- 1
-            }(req)
-        }
+```go
+req := req
+```
+
+但這在 Go 是很常見的做法。我們用相同的名稱宣告全新的變數，籍此屏壁迭代時共用的變數，使得每個 goroutine 得以使用獨立的區域變數而非共享之。
+
+讓我們回到最前面的請求處理問題。另一種可行的設計架構是直接固定 `handle` 的 goroutine 數量，限制了 goroutine 數量等同於限制了 `process` 的同時執行數。`Serve` 函式透過一個 channel 得知自己什麼時候該結束執行，而自 goroutine 開始執行之後，這個 channel 就會一直被卡住，直到有東西傳遞為止。
+
+```go
+func handle(queue chan *Request) {
+    for r := range queue {
+        process(r)
     }
+}
 
-Compare this version with the previous to see the difference in how the closure is declared and run. Another solution is just to create a new variable with the same name, as in this example:
-
-    func Serve(queue chan *Request) {
-        for req := range queue {
-            <-sem
-            req := req // Create new instance of req for the goroutine.
-            go func() {
-                process(req)
-                sem <- 1
-            }()
-        }
+func Serve(clientRequests chan *Request, quit chan bool) {
+    // 啟動 handle 處理資料
+    for i := 0; i < MaxOutstanding; i++ {
+        go handle(clientRequests)
     }
+    <-quit  // 持續等待，直到收到東西為止
+}
+```
 
-It may seem odd to write
+###<a name="channels-of-channels"></a>用 channel 傳遞 channel
 
-    req := req
+Channel 在 Go 裡面是主要資料型別之一 (first-class value)。這點相當重要，意味著 channel 也可以和其它型態的值一樣被分配和傳遞。這樣的特性常被用來實現安全的平行化分工機制。
 
-but it's a legal and idiomatic in Go to do this. You get a fresh version of the variable with the same name, deliberately shadowing the loop variable locally but unique to each goroutine.
+在前一節提到的各種案例裡，`handle` 是一個理想化的請求處理元件，但我們並沒有深入定義所謂「請求」的實際資料結構。我們可以在其內附上一個 channel，讓各個終端得以籍其回報處理結果。下面這個例子示範了 `Request` 可能的定義：
 
-Going back to the general problem of writing the server, another approach that manages resources well is to start a fixed number of handle goroutines all reading from the request channel. The number of goroutines limits the number of simultaneous calls to process. This Serve function also accepts a channel on which it will be told to exit; after launching the goroutines it blocks receiving from that channel.
+```go
+type Request struct {
+    args        []int
+    f           func([]int) int
+    resultChan  chan int
+}
+```
 
-    func handle(queue chan *Request) {
-        for r := range queue {
-            process(r)
-        }
+籍此，請求者在 `Request` 中填入想要執行的函式、參數，以及用以接收結果的 channel。
+
+```go
+func sum(a []int) (s int) {
+    for _, v := range a {
+        s += v
     }
+    return
+}
 
-    func Serve(clientRequests chan *Request, quit chan bool) {
-        // Start handlers
-        for i := 0; i < MaxOutstanding; i++ {
-            go handle(clientRequests)
-        }
-        <-quit  // Wait to be told to exit.
+request := &Request{[]int{3, 4, 5}, sum, make(chan int)}
+// 送出請求
+clientRequests <- request
+// 等待回報結果
+fmt.Printf("answer: %d\n", <-request.resultChan)
+```
+
+在伺服端，我們只需要把 handle 的函式內容修改一下：
+
+```go
+func handle(queue chan *Request) {
+    for req := range queue {
+        req.resultChan <- req.f(req.args)
     }
-
-###Channels of channels
-
-One of the most important properties of Go is that a channel is a first-class value that can be allocated and passed around like any other. A common use of this property is to implement safe, parallel demultiplexing.
-
-In the example in the previous section, handle was an idealized handler for a request but we didn't define the type it was handling. If that type includes a channel on which to reply, each client can provide its own path for the answer. Here's a schematic definition of type Request.
-
-    type Request struct {
-        args        []int
-        f           func([]int) int
-        resultChan  chan int
-    }
-
-The client provides a function and its arguments, as well as a channel inside the request object on which to receive the answer.
-
-    func sum(a []int) (s int) {
-        for _, v := range a {
-            s += v
-        }
-        return
-    }
-
-    request := &Request{[]int{3, 4, 5}, sum, make(chan int)}
-    // Send request
-    clientRequests <- request
-    // Wait for response.
-    fmt.Printf("answer: %d\n", <-request.resultChan)
-
-On the server side, the handler function is the only thing that changes.
-
-    func handle(queue chan *Request) {
-        for req := range queue {
-            req.resultChan <- req.f(req.args)
-        }
-    }
+}
+```
 
 There's clearly a lot more to do to make it realistic, but this code is a framework for a rate-limited, parallel, non-blocking RPC system, and there's not a mutex in sight.
+當然，在前面我們討論的案例中，仍有許多細節需要加以調整，但大體上已經是一個堪用的程式架構，兼具運算資源控制、平行化、非阻塞式通訊等特質，且並未（顯式地）使用任何同步鎖。
 
-###Parallelization
+###<a name="parallelization"></a>平行處理 (Parallelization)
 
-Another application of these ideas is to parallelize a calculation across multiple CPU cores. If the calculation can be broken into separate pieces that can execute independently, it can be parallelized, with a channel to signal when each piece completes.
+另一種實現共時化的方法，則是直接利用多核心處理器進行平行運算。如果整個運算過程可以拆解成多個獨立的片斷，則可將運算平行化，並利用 channel 來串連各個片段。
 
-Let's say we have an expensive operation to perform on a vector of items, and that the value of the operation on each item is independent, as in this idealized example.
+舉例來說，假設現在我們有個理想化的模型，模型中有一串資料，每筆資料運算成本昂貴但彼此獨立：
 
-    type Vector []float64
+```go
+type Vector []float64
 
-    // Apply the operation to v[i], v[i+1] ... up to v[n-1].
-    func (v Vector) DoSome(i, n int, u Vector, c chan int) {
-        for ; i < n; i++ {
-            v[i] += u.Op(v[i])
-        }
-        c <- 1    // signal that this piece is done
+// 把每個元素 v[i], v[i+1] ... v[n-1] 分別代入運算
+func (v Vector) DoSome(i, n int, u Vector, c chan int) {
+    for ; i < n; i++ {
+        v[i] += u.Op(v[i])
     }
+    c <- 1    // 回報這部份已完成計算
+}
+```
 
-We launch the pieces independently in a loop, one per CPU. They can complete in any order but it doesn't matter; we just count the completion signals by draining the channel after launching all the goroutines.
+我們把待處理資料等分，在各個處理器實體上獨立進行計算；因此運算順序並不固定，但在此我們不關心次序問題。籍由統計從 channel 來的訊號，我們可知目前各片段的完成進度。
 
-    const NCPU = 4  // number of CPU cores
+```go
+const NCPU = 4  // 處理器總數
 
-    func (v Vector) DoAll(u Vector) {
-        c := make(chan int, NCPU)  // Buffering optional but sensible.
-        for i := 0; i < NCPU; i++ {
-            go v.DoSome(i*len(v)/NCPU, (i+1)*len(v)/NCPU, u, c)
-        }
-        // Drain the channel.
-        for i := 0; i < NCPU; i++ {
-            <-c    // wait for one task to complete
-        }
-        // All done.
+func (v Vector) DoAll(u Vector) {
+    c := make(chan int, NCPU)  // 雖然緩衝區大小可設可不設，但此例中有其意義
+    for i := 0; i < NCPU; i++ {
+        go v.DoSome(i*len(v)/NCPU, (i+1)*len(v)/NCPU, u, c)
     }
+    // 不斷從 channel 中汲取訊號
+    for i := 0; i < NCPU; i++ {
+        <-c    // 等待各片斷完成運算
+    }
+    // 全部完成
+}
+```
 
-The current implementation of the Go runtime will not parallelize this code by default. It dedicates only a single core to user-level processing. An arbitrary number of goroutines can be blocked in system calls, but by default only one can be executing user-level code at any time. It should be smarter and one day it will be smarter, but until it is if you want CPU parallelism you must tell the run-time how many goroutines you want executing code simultaneously. There are two related ways to do this. Either run your job with environment variable GOMAXPROCS set to the number of cores to use or import the runtime package and call runtime.GOMAXPROCS(NCPU). A helpful value might be runtime.NumCPU(), which reports the number of logical CPUs on the local machine. Again, this requirement is expected to be retired as the scheduling and run-time improve.
+以目前 Go 的實作，上例中的各 goroutine 並非真正物理上平行運作。在預設環境下的每個時間點，任意數量的 goroutine 可以同時進行系統調用 (system call)、並阻塞到調用完成，但只能有一個 goroutine 能真正在作業系統的使用者模式 (user-level) 下運行。目前這種單執行緒的設計有改善的空間，未來會實作成真正意義的平行化；但若我們想以目前的實作環境中享受多處理器帶來的好處，則必須把 goroutine 的並行數量上限明確地告訴執行環境。現階段有兩種設定方式：一種是在執行程式之前，把處理器核心數量設在 `GOMAXPROCS` 這個環境變數裡；另一種方式，則是引入 `runtime` 這個 package，並調用 `rutime.GOMAXPROCS(NCPU)` 設定之。`runtime.NumCPU()` 可以查詢當前硬體平台的邏輯處理器個數，必要時可以加以利用。再次提醒，以上設定只是目前的權宜之計，一旦將來 goroutine 的排程相關實作得到改善，這些平行化環境的初始化設定都可以不用刻意執行。
 
-Be sure not to confuse the ideas of concurrency—structuring a program as independently executing components—and parallelism—executing calculations in parallel for efficiency on multiple CPUs. Although the concurrency features of Go can make some problems easy to structure as parallel computations, Go is a concurrent language, not a parallel one, and not all parallelization problems fit Go's model. For a discussion of the distinction, see the talk cited in this blog post.
+最後再度強調，請勿將共時化與平行化混為一談ㄧㄧ前者將整個計算結構拆解成各自獨立的片段，後者則是同時在多個處理器上進行運算。即使 Go 的共時特性可能有利於處理某些平行運算問題，Go 在本質上仍只是針對共時化處理而設計，而非平行化，因此 Go 並非適合所有的平行運算問題。[這篇文章](http://blog.golang.org/2013/01/concurrency-is-not-parallelism.html)深入討論了「共時」與「平行」之間的差異。
 
-###A leaky buffer
+###<a name="a-leaky-buffer"></a>不會滿溢的緩衝區
 
-The tools of concurrent programming can even make non-concurrent ideas easier to express. Here's an example abstracted from an RPC package. The client goroutine loops receiving data from some source, perhaps a network. To avoid allocating and freeing buffers, it keeps a free list, and uses a buffered channel to represent it. If the channel is empty, a new buffer gets allocated. Once the message buffer is ready, it's sent to the server on serverChan.
+共時化的編程技巧有時更能表現某些非共時的思維。以下這個例子來自於某個抽象化之後的 RPC package。用戶端 goroutine 不斷從某個來源（也許是網路）接收資料。為了避免頻繁地創建／銷毀緩衝區而對效能造成不利的影響，在此我們用一個帶有緩衝的 channel 作為一組鏈表，用以儲存沒有在使用的備用緩衝空間；每當需要新的緩衝區，直接從這裡取用；當這個 channel 空了，才真正向系統請求一塊記憶體。無論是先前儲存的、或是剛從系統拿到的，一旦準備好新緩衝區，就把它塞進 `serverChan`。
 
-    var freeList = make(chan *Buffer, 100)
-    var serverChan = make(chan *Buffer)
+```go
+var freeList = make(chan *Buffer, 100)
+var serverChan = make(chan *Buffer)
 
-    func client() {
-        for {
-            var b *Buffer
-            // Grab a buffer if available; allocate if not.
-            select {
-            case b = <-freeList:
-                // Got one; nothing more to do.
-            default:
-                // None free, so allocate a new one.
-                b = new(Buffer)
-            }
-            load(b)              // Read next message from the net.
-            serverChan <- b      // Send to server.
+func client() {
+    for {
+        var b *Buffer
+        // 試著從快取裡面拿一個用過的緩衝區；如果拿不到，那就做一個新的
+        select {
+        case b = <-freeList:
+            // 拿一個舊的出來，除此之外沒有額外動作
+        default:
+            // 沒有空閒的緩衝區可用，只好弄一個新的來
+            b = new(Buffer)
+        }
+        load(b)              // 從網路上讀一段資料進來
+        serverChan <- b      // 把資料往伺服端遞送
+    }
+}
+```
+
+伺服端持續從用戶端接收資料，處理資料，然後歸還緩衝區。
+
+```go
+func server() {
+    for {
+        b := <-serverChan    // 等待新工作上門
+        process(b)
+        // 如果快取還有空位的話，就把緩衝區還到快取裡面
+        select {
+        case freeList <- b:
+            // 把連西塞回鏈表；除此之外不做事
+        default:
+            // 鏈表滿了，直接繼續往下執行
         }
     }
+}
+```
 
-The server loop receives each message from the client, processes it, and returns the buffer to the free list.
-
-    func server() {
-        for {
-            b := <-serverChan    // Wait for work.
-            process(b)
-            // Reuse buffer if there's room.
-            select {
-            case freeList <- b:
-                // Buffer on free list; nothing more to do.
-            default:
-                // Free list full, just carry on.
-            }
-        }
-    }
-
-The client attempts to retrieve a buffer from freeList; if none is available, it allocates a fresh one. The server's send to freeList puts b back on the free list unless the list is full, in which case the buffer is dropped on the floor to be reclaimed by the garbage collector. (The default clauses in the select statements execute when no other case is ready, meaning that the selects never block.) This implementation builds a leaky bucket free list in just a few lines, relying on the buffered channel and the garbage collector for bookkeeping.
+用戶端試圖從 `freeList` 取緩衝區來用；如果拿不到，則創造一個全新的出來。伺服端每次用完之後就把 `b` 塞回緩衝區快取鏈表 `freeList`；如果鏈表滿了，就直接不多作處理，把過剩的緩衝扔在路邊，過陣子會自動被垃圾回收機制處理掉（在 `select` 中的 `default` 敘述句只會在沒有任何的 `case` 項目可以馬上執行時才會進入；也就是說，帶有 `default` 的 `select` 區塊是不會被阻塞的）。這短短數行只利用緩衝 channel 和垃圾回收機制，就實現了自動控制容量、不會滿溢的快取鏈表。
 
 ##Errors
 
