@@ -48,7 +48,7 @@
     - [Import for side effect](#import-for-side-effect)
     - [Interface checks](#interface-checks)
 - [Embedding](#embedding)
-- [共時性 (Concurrency)](#concurrency)
+- [Concurrency](#concurrency)
     - [以通訊實現資料共享](#share-by-communicating)
     - [Goroutines](#goroutines)
     - [Channels](#channels)
@@ -1508,29 +1508,31 @@ Embedding types introduces the problem of name conflicts but the rules to resolv
 
 Second, if the same name appears at the same nesting level, it is usually an error; it would be erroneous to embed log.Logger if the Job struct contained another field or method called Logger. However, if the duplicate name is never mentioned in the program outside the type definition, it is OK. This qualification provides some protection against changes made to types embedded from outside; there is no problem if a field is added that conflicts with another field in another subtype if neither field is ever used.
 
-##<a name="concurrency"></a>共時性 (Concurrency)
+##<a name="concurrency"></a>Concurrency
 ###<a name="share-by-communicating"></a>以通訊實現資料共享
+
+（譯註：concurrency 一譯「共時性」；由於這個概念本身較為抽象，又為避免和心理學上的同時性 synchronicity 混淆，以下保留原文名詞）
 
 Concurrent programming 是個非常值得探討的議題，對此，Go 也有一些需要專門提出來討論的部份。
 
-共時環境中共享變數內容需要一些精妙的技巧來保證其正確性，使得共時編程在許多情況下並不容易。在 Go 的生態裡，我們鼓勵另外一種做法ㄧㄧ利用 channel 來傳遞需要共享的值，並避免讓多個執行緒頻繁地共享資源；無時無刻只讓單一 goroutine 有權存取特定變數，籍以避免資料競態 (data race)。為了宣揚此類理念，我們有個簡單的口號：
+在 concurrent 環境中共享變數內容需要一些精妙的技巧來保證其正確性，使得 concurrency programming 在許多情況下並不容易。在 Go 的生態裡，我們鼓勵另外一種做法ㄧㄧ利用 channel 來傳遞需要共享的值，並避免讓多個 thread 頻繁地共享資源；無時無刻只讓單一 goroutine 有權存取特定變數，籍以避免資料競態 (data race)。為了宣揚此類理念，我們有個簡單的口號：
 
 以溝通實現共享，而非以共享實現溝通。
 
-當然，這樣的做法並非此類問題唯一或最簡單的解決方向，例如，在同步鎖 (mutex) 保護下的參照計數 (reference count) 一樣可以在多執行緒之間維持資料正確性。但以高階程式語言的設計觀點，利用 channel 來控制資料分享是更淺顯且不易出錯的方案。
+當然，這樣的做法並非此類問題唯一或最簡單的解決方向，例如，在同步鎖 (mutex) 保護下的參照計數 (reference count) 一樣可以在多個 thread 之間維持資料正確性。但以高階程式語言的設計觀點，利用 channel 來控制資料分享是更淺顯且不易出錯的方案。
 
-對於這種設計思維，這邊有一種簡單的理解方式。設想一支在單核心處理器上執行的典型的單執行緒程式，以它的架構當然毋需考慮任何資料同步問題；現在把兩個這樣的架構並聯在一起，因為各別仍是獨立的單一執行緒，所以仍不需考慮同步。接著，我們讓這兩個執行緒進行通訊；如果通訊機制本身已經針對資料同步問題特別設計過，那麼整體而言仍不需對架構作出任何修改。UNIX pipe 正式此類設計的一種體現。雖然 Go 在這方面是基於 Hoare 提出的 Communicating Sequential Processes (CSP) 而設計，我們仍然可以把 channel 視為是一種型別安全的 UNIX pipe 延伸產物。
+對於這種設計思維，這邊有一種簡單的理解方式。設想一支在單核心處理器上執行的典型的單一 thread 程式，以它的架構當然毋需考慮任何資料同步問題；現在把兩個這樣的架構並聯在一起，因為各別仍是獨立的單一 thread 架構，所以仍不需考慮同步。接著，我們讓這兩個 thread 進行通訊；如果通訊機制本身已經針對資料同步問題特別設計過，那麼整體而言仍不需對架構作出任何修改。UNIX pipe 正式此類設計的一種體現。雖然 Go 在這方面是基於 Hoare 提出的 Communicating Sequential Processes (CSP) 而設計，我們仍然可以把 channel 視為是一種型別安全的 UNIX pipe 延伸產物。
 
 ###<a name="goroutines"></a>Goroutines
 
-之所以提出 *goroutine* 這個特殊名詞，是因為它並非單單只是傳統概念上的執行緒、coroutine、甚至 process。一個 goroutine 只是一個單純的模型：一個函式與其它 goroutine 同時在同一個記憶體空間內執行。它非常輕量，用到的記憶體只比 call stack 多一點點；而 call stack 本身並不大，所以整體而言創造 goroutine 沒什麼成本，只隨著執行需求動態地增減所用到的 heap 空間。
+之所以提出 *goroutine* 這個特殊名詞，是因為它並非單單只是傳統概念上的 thread、coroutine、甚至 process。一個 goroutine 只是一個單純的模型：一個函式與其它 goroutine 同時在同一個記憶體空間內執行。它非常輕量，用到的記憶體只比 call stack 多一點點；而 call stack 本身並不大，所以整體而言創造 goroutine 沒什麼成本，只隨著執行需求動態地增減所用到的 heap 空間。
 
-多個 goroutine 會在多個作業系統執行緒上同時運作，所以假若某個 goroutine 因為等待系統 I/O 之類的理由而被阻塞，其它的 goroutine 會繼續執行不受其影響。其實作在台面下其實隱藏許多複雜的執行緒管理機制。
+多個 goroutine 會在多個作業系統 thread 上同時運作，所以假若某個 goroutine 因為等待系統 I/O 之類的理由而被阻塞，其它的 goroutine 會繼續執行不受其影響。其實作在台面下其實隱藏許多複雜的 thread 管理機制。
 
 如果在函式調用時在前面加上 `go` 這個關鍵字，那麼這個調用就會被放到一個新的 goroutine 上執行。隨著該函式返回，goroutine 也會無聲無息地隨之結束。（這就好比 UNIX shell 裡面，如果在一行指令最後加上 `&` 符號，那麼這行指令會靜靜地在背景執行）
 
 ```go
-go list.Sort()  // 共時化調用 list.Sort；我們不會在此等待其執行結果
+go list.Sort()  // 非同步調用 list.Sort；我們不會在此等待其執行結果
 ```
 
 匿名函式有時會讓我們能更方便地使用 goroutine。
@@ -1616,7 +1618,7 @@ func Serve(queue chan *Request) {
 }
 ```
 
-上面這個例子的問題在於，在 Go 的 `for` 迴圈中，迭代變數在每輪迭代中被複用，所以 `req` 變數被每個 goroutine 所共享。我們必須在此保證每個 goroutine 使用各別的 `req`，因此下例中便把 `req` 作為參數帶入閉包中：
+上面這個例子的問題在於，在 Go 的 `for` 迴圈中，迭代變數在每輪迭代中被複用，所以 `req` 變數被每個 goroutine 所共享。我們必須在此保證每個 goroutine 使用各別的 `req`，因此下例中便把 `req` 作為參數帶入 closure 裡面：
 
 ```go
 func Serve(queue chan *Request) {
@@ -1630,7 +1632,7 @@ func Serve(queue chan *Request) {
 }
 ```
 
-請比較一下以上幾個版本中閉包宣告與執行方式的差異；以下是另一種解決方式，此例子在每次迭代裡創建同名但全新的變數：
+請比較一下以上幾個版本中 closure 的宣告與執行方式的差異；以下是另一種解決方式，此例子在每次迭代裡創建同名但全新的變數：
 
 ```go
 func Serve(queue chan *Request) {
@@ -1712,12 +1714,11 @@ func handle(queue chan *Request) {
 }
 ```
 
-There's clearly a lot more to do to make it realistic, but this code is a framework for a rate-limited, parallel, non-blocking RPC system, and there's not a mutex in sight.
 當然，在前面我們討論的案例中，仍有許多細節需要加以調整，但大體上已經是一個堪用的程式架構，兼具運算資源控制、平行化、非阻塞式通訊等特質，且並未（顯式地）使用任何同步鎖。
 
 ###<a name="parallelization"></a>平行處理 (Parallelization)
 
-另一種實現共時化的方法，則是直接利用多核心處理器進行平行運算。如果整個運算過程可以拆解成多個獨立的片斷，則可將運算平行化，並利用 channel 來串連各個片段。
+另一種實現 concurrency 的方法，則是直接利用多核心處理器進行平行運算。如果整個運算過程可以拆解成多個獨立的片斷，則可將運算平行化，並利用 channel 來串連各個片段。
 
 舉例來說，假設現在我們有個理想化的模型，模型中有一串資料，每筆資料運算成本昂貴但彼此獨立：
 
@@ -1751,13 +1752,13 @@ func (v Vector) DoAll(u Vector) {
 }
 ```
 
-以目前 Go 的實作，上例中的各 goroutine 並非真正物理上平行運作。在預設環境下的每個時間點，任意數量的 goroutine 可以同時進行系統調用 (system call)、並阻塞到調用完成，但只能有一個 goroutine 能真正在作業系統的使用者模式 (user-level) 下運行。目前這種單執行緒的設計有改善的空間，未來會實作成真正意義的平行化；但若我們想以目前的實作環境中享受多處理器帶來的好處，則必須把 goroutine 的並行數量上限明確地告訴執行環境。現階段有兩種設定方式：一種是在執行程式之前，把處理器核心數量設在 `GOMAXPROCS` 這個環境變數裡；另一種方式，則是引入 `runtime` 這個 package，並調用 `rutime.GOMAXPROCS(NCPU)` 設定之。`runtime.NumCPU()` 可以查詢當前硬體平台的邏輯處理器個數，必要時可以加以利用。再次提醒，以上設定只是目前的權宜之計，一旦將來 goroutine 的排程相關實作得到改善，這些平行化環境的初始化設定都可以不用刻意執行。
+以目前 Go 的實作，上例中的各 goroutine 並非真正物理上平行運作。在預設環境下的每個時間點，任意數量的 goroutine 可以同時進行系統調用 (system call)、並阻塞到調用完成，但只能有一個 goroutine 能真正在作業系統的使用者模式 (user-level) 下運行。目前這種單一 thread 的設計有改善的空間，未來會實作成真正意義的平行化；但若我們想以目前的實作環境中享受多處理器帶來的好處，則必須把 goroutine 的並行數量上限明確地告訴執行環境。現階段有兩種設定方式：一種是在執行程式之前，把處理器核心數量設在 `GOMAXPROCS` 這個環境變數裡；另一種方式，則是引入 `runtime` 這個 package，並調用 `rutime.GOMAXPROCS(NCPU)` 設定之。`runtime.NumCPU()` 可以查詢當前硬體平台的邏輯處理器個數，必要時可以加以利用。再次提醒，以上設定只是目前的權宜之計，一旦將來 goroutine 的排程相關實作得到改善，這些平行化環境的初始化設定都可以不用刻意執行。
 
-最後再度強調，請勿將共時化與平行化混為一談ㄧㄧ前者將整個計算結構拆解成各自獨立的片段，後者則是同時在多個處理器上進行運算。即使 Go 的共時特性可能有利於處理某些平行運算問題，Go 在本質上仍只是針對共時化處理而設計，而非平行化，因此 Go 並非適合所有的平行運算問題。[這篇文章](http://blog.golang.org/2013/01/concurrency-is-not-parallelism.html)深入討論了「共時」與「平行」之間的差異。
+最後再度強調，請勿將 concurrency 與 parallelism 混為一談ㄧㄧ前者將整個計算結構拆解成各自獨立的片段，後者則是同時在多個處理器上進行運算。即使 Go 針對 concurrency 的設計可能有利於處理某些平行運算問題，Go 在本質上仍只是針對 concurrency 而設計，而非 parallelism，因此 Go 並非適合所有的平行運算問題。[這篇文章](http://blog.golang.org/2013/01/concurrency-is-not-parallelism.html)深入討論了「concurrency」與「parallelism」之間的差異。
 
 ###<a name="a-leaky-buffer"></a>不會滿溢的緩衝區
 
-共時化的編程技巧有時更能表現某些非共時的思維。以下這個例子來自於某個抽象化之後的 RPC package。用戶端 goroutine 不斷從某個來源（也許是網路）接收資料。為了避免頻繁地創建／銷毀緩衝區而對效能造成不利的影響，在此我們用一個帶有緩衝的 channel 作為一組鏈表，用以儲存沒有在使用的備用緩衝空間；每當需要新的緩衝區，直接從這裡取用；當這個 channel 空了，才真正向系統請求一塊記憶體。無論是先前儲存的、或是剛從系統拿到的，一旦準備好新緩衝區，就把它塞進 `serverChan`。
+Concurrency programming 的技巧有時更能表現某些非 concurrent 的思維。以下這個例子來自於某個抽象化之後的 RPC package。用戶端 goroutine 不斷從某個來源（也許是網路）接收資料。為了避免頻繁地創建／銷毀緩衝區而對效能造成不利的影響，在此我們用一個帶有緩衝的 channel 作為一組鏈表，用以儲存沒有在使用的備用緩衝空間；每當需要新的緩衝區，直接從這裡取用；當這個 channel 空了，才真正向系統請求一塊記憶體。無論是先前儲存的、或是剛從系統拿到的，一旦準備好新緩衝區，就把它塞進 `serverChan`。
 
 ```go
 var freeList = make(chan *Buffer, 100)
