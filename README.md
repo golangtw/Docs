@@ -1,4 +1,4 @@
-Golang-Docs-zhTW
+Golang 中文文件
 ================
 
 ## 簡介 Introduction
@@ -43,6 +43,13 @@ Golang-Docs-zhTW
 - memory 記憶體
 - programming 程式設計
 - variable 變數
+
+## 開發
+
+致各位翻譯者，更新 repo 請愛用 git rebase, e.g.,
+
+    git pull --rebase origin master
+
 
 ## 聯絡方式 Contact Us
 
