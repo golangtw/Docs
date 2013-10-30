@@ -62,7 +62,9 @@
 
 ---
 
-##Introduction
+##簡介
+
+Go 是一個新的語言。雖然這個語言從其他語言借用了許多想法，但他有許多特點使得高效的 Go 程式與其他語言實作的程式許多不同。 (暫譯)
 
 Go is a new language. Although it borrows ideas from existing languages, it has unusual properties that make effective Go programs different in character from programs written in its relatives. A straightforward translation of a C++ or Java program into Go is unlikely to produce a satisfactory result—Java programs are written in Java, not Go. On the other hand, thinking about the problem from a Go perspective could produce a successful but quite different program. In other words, to write Go well, it's important to understand its properties and idioms. It's also important to know the established conventions for programming in Go, such as naming, formatting, program construction, and so on, so that programs you write will be easy for other Go programmers to understand.
 
