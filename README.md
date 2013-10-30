@@ -44,6 +44,6 @@ Golang-Docs-zhTW
 - programming 程式設計
 - variable 變數
 
-## 聯絡方式 Conteact Us
+## 聯絡方式 Contact Us
 
 目前 Golang TW [在 freenode 上有專門的 IRC channel](http://webchat.freenode.net/?channels=golang.tw)「#golang.tw」，歡迎與大家一起討論！
