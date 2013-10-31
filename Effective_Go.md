@@ -55,7 +55,7 @@
     - [用 channel 傳遞 channel](#channels-of-channels)
     - [平行處理 (Parallelization)](#parallelization)
     - [不會滿溢的緩衝區](#a-leaky-buffer)
-- [Errors](#errors)
+- [錯誤處理](#errors)
     - [Panic](#panic)
     - [Recover](#recove)
 - [A web server](#a-web-server)
@@ -1802,147 +1802,164 @@ func server() {
 
 用戶端試圖從 `freeList` 取緩衝區來用；如果拿不到，則創造一個全新的出來。伺服端每次用完之後就把 `b` 塞回緩衝區快取鏈表 `freeList`；如果鏈表滿了，就直接不多作處理，把過剩的緩衝扔在路邊，過陣子會自動被垃圾回收機制處理掉（在 `select` 中的 `default` 敘述句只會在沒有任何的 `case` 項目可以馬上執行時才會進入；也就是說，帶有 `default` 的 `select` 區塊是不會被阻塞的）。這短短數行只利用緩衝 channel 和垃圾回收機制，就實現了自動控制容量、不會滿溢的快取鏈表。
 
-##Errors
+##<a name="errors"></a>錯誤處理
 
-Library routines must often return some sort of error indication to the caller. As mentioned earlier, Go's multivalue return makes it easy to return a detailed error description alongside the normal return value. By convention, errors have type error, a simple built-in interface.
+函式庫提供各式各樣的工具元件，有時也必須回報適當的錯誤訊息給調用者。如同先前提過，Go 允許函式一次返回多個值；利用這點，我們可以在返迴一般數值結果的同時描述錯誤的發生狀況。慣例上，錯誤訊息會包裝成 `error`，這是一種內建的 interface。
 
-    type error interface {
-        Error() string
-    }
+```go
+type error interface {
+    Error() string
+}
+```
 
-A library writer is free to implement this interface with a richer model under the covers, making it possible not only to see the error but also to provide some context. For example, os.Open returns an os.PathError.
+函式庫開發者可以自由地實現這個 interface，闊展其內容，甚至在描述問題的同時也把執行期上下文包裝進去，`os.Open` 所返回的 `os.PathError` 便是一例。
 
-    // PathError records an error and the operation and
-    // file path that caused it.
-    type PathError struct {
-        Op string    // "open", "unlink", etc.
-        Path string  // The associated file.
-        Err error    // Returned by the system call.
-    }
+```go
+// PathError 不但描述錯誤訊息，
+// 同時也記載當時對哪個檔案進行什麼操作
+type PathError struct {
+    Op string    // 諸如 "open" 或 "unlink" …等等
+    Path string  // 欲操作的檔案路徑
+    Err error    // 系統呼叫產生的錯誤代碼
+}
 
-    func (e *PathError) Error() string {
-        return e.Op + " " + e.Path + ": " + e.Err.Error()
-    }
+func (e *PathError) Error() string {
+    return e.Op + " " + e.Path + ": " + e.Err.Error()
+}
+```
 
-PathError's Error generates a string like this:
+`PathError` 的 `Error` 介面在發生問題可能會產生類似如下描述：
 
     open /etc/passwx: no such file or directory
+    （譯註：open /etc/passwx: 找不到檔案或資料夾）
 
-Such an error, which includes the problematic file name, the operation, and the operating system error it triggered, is useful even if printed far from the call that caused it; it is much more informative than the plain "no such file or directory".
+這段敘述指出哪個檔案發生問題、當時做了什麼事、以及作業系統回報錯誤的理由；即便我們不在事發當時馬上處理這個錯誤，事後仍有足夠清楚的資訊能瞭解當時發生了什麼事。這樣的錯誤訊息至少比單純抱怨「no such file or directory（找不到檔案或資料夾）」來得有意義得多。
 
-When feasible, error strings should identify their origin, such as by having a prefix naming the operation or package that generated the error. For example, in package image, the string representation for a decoding error due to an unknown format is "image: unknown format".
+錯誤訊息應儘可能地描述其發生原因，包括當時意圖進行的操作，還有這個錯誤來自於哪個 package。舉例而言，如果要利用 `image` 這個 package 裡面的方法對圖像資料進行解碼，但它不認得目標的實際編碼格式，則可能會得到像是「image: unknown format」這樣的訊息。
 
-Callers that care about the precise error details can use a type switch or a type assertion to look for specific errors and extract details. For PathErrors this might include examining the internal Err field for recoverable failures.
+如果函式調用方想從 `error` 中得到更詳細的資訊，可以試著利用 type switch 或 type assertion 得到 error 的實際型態，進而從中解出細節。以這裡遇到的 `PathError` 為例，籍由比對 `Err` 欄位，我們得以在問題發生後採取補救手段。
 
-    for try := 0; try < 2; try++ {
-        file, err = os.Create(filename)
-        if err == nil {
-            return
-        }
-        if e, ok := err.(*os.PathError); ok && e.Err == syscall.ENOSPC {
-            deleteTempFiles()  // Recover some space.
-            continue
-        }
+```go
+for try := 0; try < 2; try++ {
+    file, err = os.Create(filename)
+    if err == nil {
         return
     }
-
-The second if statement here is another type assertion. If it fails, ok will be false, and e will be nil. If it succeeds, ok will be true, which means the error was of type *os.PathError, and then so is e, which we can examine for more information about the error.
-
-###Panic
-
-The usual way to report an error to a caller is to return an error as an extra return value. The canonical Read method is a well-known instance; it returns a byte count and an error. But what if the error is unrecoverable? Sometimes the program simply cannot continue.
-
-For this purpose, there is a built-in function panic that in effect creates a run-time error that will stop the program (but see the next section). The function takes a single argument of arbitrary type—often a string—to be printed as the program dies. It's also a way to indicate that something impossible has happened, such as exiting an infinite loop.
-
-    // A toy implementation of cube root using Newton's method.
-    func CubeRoot(x float64) float64 {
-        z := x/3   // Arbitrary initial value
-        for i := 0; i < 1e6; i++ {
-            prevz := z
-            z -= (z*z*z-x) / (3*z*z)
-            if veryClose(z, prevz) {
-                return z
-            }
-        }
-        // A million iterations has not converged; something is wrong.
-        panic(fmt.Sprintf("CubeRoot(%g) did not converge", x))
+    if e, ok := err.(*os.PathError); ok && e.Err == syscall.ENOSPC {
+        deleteTempFiles()  // 釋放一些不用的空間
+        continue
     }
+    return
+}
+```
 
-This is only an example but real library functions should avoid panic. If the problem can be masked or worked around, it's always better to let things continue to run rather than taking down the whole program. One possible counterexample is during initialization: if the library truly cannot set itself up, it might be reasonable to panic, so to speak.
+上例中的第二個 if 判斷式裡面是一條 type assertion。如果轉型失敗，`ok` 的值會變成 `false`，而 `e` 會變成 `nil`；反之若轉型成功，`ok` 則會變成 `true`，意即 `error` 實際上可以還原成 `*os.PathError`，我們得以從還原後的 `e` 查出更多的相關資訊。
 
-    var user = os.Getenv("USER")
+###<a name="panic"></a>Panic
 
-    func init() {
-        if user == "" {
-            panic("no value for $USER")
+一般常見的錯誤回報機制，是把 `error` 作為多重返回值之一傳回去。標準函式庫中的 `Read` 是一個眾所皆知的典型範例，它除了返回實際讀入的 byte 數，同時附帶一個 `error`。但，萬一發生的意外其實根本無法作出任何補救呢？有時候程式在這種情況下根本無法繼續運作。
+
+為了應付這種狀況，我們可以利用內建函式 `panic` 產生一個執行期錯誤（run-time error），這會使得程式直接停止（這樣的說法其實不夠完整，我們在下一節會解釋）。這個函式接受一個任意種類的參數，作為程式死亡時的線索，習慣上會在此傳入說明用的字串。我們也可以利用這個函式指出邏輯上沒有道理的錯誤，例如跳離一個不該跳離的無限迴圈。
+
+```go
+// 利用牛頓法求立方根的小玩具
+func CubeRoot(x float64) float64 {
+    z := x/3   // 給定任意的初始值
+    for i := 0; i < 1e6; i++ {
+        prevz := z
+        z -= (z*z*z-x) / (3*z*z)
+        if veryClose(z, prevz) {
+            return z
         }
     }
+    // 經過一百萬次迭代仍未收斂，一定有哪邊出了問題
+    panic(fmt.Sprintf("CubeRoot(%g) 沒有收斂", x))
+}
+```
 
-###Recover
+這只是一個小小的範例，但實際應用上我們應該避免在設計函式庫時使用 `panic`。如果一個問題可以用其它方式掩蓋或補救，對整支程式而言依然是好死不如賴活。以下是少數的反例，在程式初始化時使用 `panic`：如果一個函式庫連最基本的初始準備都無法順利完成，那麼也只有 `panic` 一途。
 
-When panic is called, including implicitly for run-time errors such as indexing a slice out of bounds or failing a type assertion, it immediately stops execution of the current function and begins unwinding the stack of the goroutine, running any deferred functions along the way. If that unwinding reaches the top of the goroutine's stack, the program dies. However, it is possible to use the built-in function recover to regain control of the goroutine and resume normal execution.
+```go
+var user = os.Getenv("USER")
 
-A call to recover stops the unwinding and returns the argument passed to panic. Because the only code that runs while unwinding is inside deferred functions, recover is only useful inside deferred functions.
+func init() {
+    if user == "" {
+        panic("找不到 $USER 這個值")
+    }
+}
+```
 
-One application of recover is to shut down a failing goroutine inside a server without killing the other executing goroutines.
+###<a name="recove"></a>Recover
 
-    func server(workChan <-chan *Work) {
-        for work := range workChan {
-            go safelyDo(work)
+當 `panic` 發生，無論其肇因於某次存取 slice 時超過其合法長度、或是 type assertion 失敗等等造成的執行期錯誤，正在執行的函式都會馬上中斷，接著會從當前所在位置開始、把先前的 deferred function 一一展開執行。如果最後展開到其 goroutine 的 call stack 頂端，整支程式就往生了。然而，內建函式 `recover` 可以讓我們在發生 panic 時重掌 goroutine，進而使程式回歸正軌。
+
+調用 `recover` 可以阻止繼續展開 deferred functon，並回傳把先前塞進 panic 的參數。因為 panic 情況下的展開過程只會執行 deferred function 內的邏輯，所以 recover 只在被 deferred function 內才派得上用場。
+
+`recover` 的其中一種應用，是在伺服器內用以善後執行失敗的 goroutine，防止其中某個 goroutine 發生問題的同時一併抹殺其它 goroutine。
+
+```go
+func server(workChan <-chan *Work) {
+    for work := range workChan {
+        go safelyDo(work)
+    }
+}
+
+func safelyDo(work *Work) {
+    defer func() {
+        if err := recover(); err != nil {
+            log.Println("處理失敗:", err)
         }
-    }
+    }()
+    do(work)
+}
+```
 
-    func safelyDo(work *Work) {
-        defer func() {
-            if err := recover(); err != nil {
-                log.Println("work failed:", err)
-            }
-        }()
-        do(work)
-    }
+上例中的 `do(work)` 一旦發生 panic，則這個事件會被記錄下來，完成善後之後 goroutine 自己安靜地結束，不致影響其它 goroutine。整個 deferred closure 內容就是如此單純，僅須調用 `recover` 並處理其結果。
 
-In this example, if do(work) panics, the result will be logged and the goroutine will exit cleanly without disturbing the others. There's no need to do anything else in the deferred closure; calling recover handles the condition completely.
+因為在 deferred function 以外的情況使用 `recover` 只會得到 `nil`，所以 deferred function 的內部仍可正常使用任何函式，即便它可能 panic。以上例來說，`safelyDo` 內的 deferred function 裡，在調用 `recover` 之前仍可執行記錄事件的相關邏輯，log package 內的元件不會因為目前所處的環境是 panic stack 而受到影響。
 
-Because recover always returns nil unless called directly from a deferred function, deferred code can call library routines that themselves use panic and recover without failing. As an example, the deferred function in safelyDo might call a logging function before calling recover, and that logging code would run unaffected by the panicking state.
+在剛剛提出的錯誤回復架構裡，`do` 函式（與其內調用的其它函式們）可以籍由調用 `panic` 輕易地跳離任何困境。這種手法得以簡化整個錯誤處理機制，在開發大型程式時尤其實用。讓我們看看下面這個例子，這是一個理想化的正規表示式函式庫，它會在語法無法正確解析的時候產生一個自定義的 panic。以下片段包括 `Error` 型別的定義、型別方法 `error`，以及 `Compile` 函式的內容：
 
-With our recovery pattern in place, the do function (and anything it calls) can get out of any bad situation cleanly by calling panic. We can use that idea to simplify error handling in complex software. Let's look at an idealized version of a regexp package, which reports parsing errors by calling panic with a local error type. Here's the definition of Error, an error method, and the Compile function.
+```go
+// Error 型別用以表示語法錯誤；這個型別實作了 error 介面。
+type Error string
+func (e Error) Error() string {
+    return string(e)
+}
 
-    // Error is the type of a parse error; it satisfies the error interface.
-    type Error string
-    func (e Error) Error() string {
-        return string(e)
-    }
+// 當 *Regexp 試圖回報語法解析錯誤，會籍由 panic 把 Error 報出來，
+// 而 error 則是這個 Error 用以敘述問題的方法
+func (regexp *Regexp) error(err string) {
+    panic(Error(err))
+}
 
-    // error is a method of *Regexp that reports parsing errors by
-    // panicking with an Error.
-    func (regexp *Regexp) error(err string) {
-        panic(Error(err))
-    }
+// Compile 會傳回正規表示式的解析結果
+func Compile(str string) (regexp *Regexp, err error) {
+    regexp = new(Regexp)
+    // 如果語法解析出了問題，doParse 會發生 panic
+    defer func() {
+        if e := recover(); e != nil {
+            regexp = nil    // 清空返回值
+            err = e.(Error) // 如果轉型失敗，則會發生新的 panic
+        }
+    }()
+    return regexp.doParse(str), nil
+}
+```
 
-    // Compile returns a parsed representation of the regular expression.
-    func Compile(str string) (regexp *Regexp, err error) {
-        regexp = new(Regexp)
-        // doParse will panic if there is a parse error.
-        defer func() {
-            if e := recover(); e != nil {
-                regexp = nil    // Clear return value.
-                err = e.(Error) // Will re-panic if not a parse error.
-            }
-        }()
-        return regexp.doParse(str), nil
-    }
+如果 `doParse` 發生 panic，這裡會將返回值回復成 `nil` ㄧㄧ deferred function 內可以直接存取這個返回變數。接著請看 `err` 賦值這行，在此確認 panic 扔出值的實際型別是否的確是前面自定義的 `Error`；如果不是，則 type assertion 失敗，此時產生執行期錯誤，繼續把 panic stack 的各函式向上展開。後面這個段檢驗意味著，如果發生了什麼真正超出預期的事（例如記憶體存取越界），這段程式碼不會因為有用到 `recover` 來處理 `panic` 就一定能正常結束。
 
-If doParse panics, the recovery block will set the return value to nil—deferred functions can modify named return values. It will then check, in the assignment to err, that the problem was a parse error by asserting that it has the local type Error. If it does not, the type assertion will fail, causing a run-time error that continues the stack unwinding as though nothing had interrupted it. This check means that if something unexpected happens, such as an index out of bounds, the code will fail even though we are using panic and recover to handle parse errors.
+`Error` 的 `error` 結繫於資料型別之上，故稱為方法；其與內建型別 `error` 同名，這沒什麼問題，而且渾然天成。有了以上的錯誤處理設計，使人得以更方便地回報語法錯問題，而不需要在發生問題時自己設法展開整個解析進度。
 
-With error handling in place, the error method (because it's a method bound to a type, it's fine, even natural, for it to have the same name as the builtin error type) makes it easy to report parse errors without worrying about unwinding the parse stack by hand:
+```go
+if pos == 0 {
+    re.error("符號 '*' 不得置於句首")
+}
+```
 
-    if pos == 0 {
-        re.error("'*' illegal at start of expression")
-    }
+雖然這種設計很實用，但這該被限制只在 package 內部使用。`Parse` 把內部 `panic` 的內容當作是一般的 `error` 返回值，而不將 panic 細節暴露給 package 使用者。這是一個值得遵循的規則。
 
-Useful though this pattern is, it should be used only within a package. Parse turns its internal panic calls into error values; it does not expose panics to its client. That is a good rule to follow.
-
-By the way, this re-panic idiom changes the panic value if an actual error occurs. However, both the original and new failures will be presented in the crash report, so the root cause of the problem will still be visible. Thus this simple re-panic approach is usually sufficient—it's a crash after all—but if you want to display only the original value, you can write a little more code to filter unexpected problems and re-panic with the original error. That's left as an exercise for the reader.
+順帶一提，這種重覆 panic 的設計模式會覆寫原有的 panic 內容。然而無論新舊錯誤訊息，都會在程式崩壞時回報出來，因此問題的根源依然有跡可循。以上提到的這個重覆 panic 手法總是相當實用，雖然最終仍會導致程式崩壞，但讓人得以在處理 panic 時插入一些內容以觀察變數實際內容，過濾不想理會的部份，最後再度把原值 panic 出去。至於解決問題的工作，則留給看到這些錯誤訊息的人。
 
 ##A web server
 
