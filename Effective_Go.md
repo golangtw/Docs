@@ -455,24 +455,26 @@ To close this section, here's a comparison routine for byte slices that uses two
         return 0
     }
 
-##Type switch
+##<a name="type-switch"></a>Type switch
 
-A switch can also be used to discover the dynamic type of an interface variable. Such a type switch uses the syntax of a type assertion with the keyword type inside the parentheses. If the switch declares a variable in the expression, the variable will have the corresponding type in each clause. It's also idiomatic to reuse the name in such cases, in effect declaring a new variable with the same name but a different type in each case.
+`switch` 區塊也可以用以動態判斷一個 interface 變數的實際型別，寫法上像對該變數作 type assertion，但是把括號內的型別名稱改成關鍵字 `type`。如果 `switch` 開頭的轉型敘述用一個變數來承接，那麼這個新變數在每個條款內就直接變成該條款對應的型別；常見的用法是讓承接用的變數與被判斷的原變數同名，如此一來在各型別條款內，原變數就好像已經被轉型過了一般。
 
-    var t interface{}
-    t = functionOfSomeType()
-    switch t := t.(type) {
-    default:
-        fmt.Printf("unexpected type %T", t)       // %T prints whatever type t has
-    case bool:
-        fmt.Printf("boolean %t\n", t)             // t has type bool
-    case int:
-        fmt.Printf("integer %d\n", t)             // t has type int
-    case *bool:
-        fmt.Printf("pointer to boolean %t\n", *t) // t has type *bool
-    case *int:
-        fmt.Printf("pointer to integer %d\n", *t) // t has type *int
-    }
+```go
+var t interface{}
+t = functionOfSomeType()
+switch t := t.(type) {
+default:
+    fmt.Printf("非預期的型別 %T", t)              // %T 可以印出 t 的型別名稱
+case bool:
+    fmt.Printf("boolean %t\n", t)                 // t 的型別是 bool
+case int:
+    fmt.Printf("整數 %d\n", t)                    // t 的型別是 int
+case *bool:
+    fmt.Printf("一個指標，指向 boolean %t\n", *t) // t 的型別是 *bool
+case *int:
+    fmt.Printf("一個指標，指向整數 %d\n", *t)     // t 的型別是 *int
+}
+```
 
 ##Functions
 ###Multiple return values
