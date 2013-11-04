@@ -42,6 +42,7 @@ Golang 中文文件
 - function 函式
 - memory 記憶體
 - programming 程式設計
+- case `case` 述句
 - variable 變數
 
 ## 開發

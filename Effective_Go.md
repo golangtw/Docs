@@ -457,7 +457,7 @@ To close this section, here's a comparison routine for byte slices that uses two
 
 ##<a name="type-switch"></a>Type switch
 
-`switch` 區塊也可以用以動態判斷一個 interface 變數的實際型別，寫法上像對該變數作 type assertion，但是把括號內的型別名稱改成關鍵字 `type`。如果 `switch` 開頭的轉型敘述用一個變數來承接，那麼這個新變數在每個條款內就直接變成該條款對應的型別；常見的用法是讓承接用的變數與被判斷的原變數同名，如此一來在各型別條款內，原變數就好像已經被轉型過了一般。
+`switch` 區塊也可以用以動態判斷一個 interface 變數的實際型別，寫法上像對該變數作 type assertion，但是把括號內的型別名稱改成關鍵字 `type`。如果 `switch` 開頭的轉型敘述用一個變數來承接，此變數在每個 `case` 述句內就會直接被轉型；更常見的用法，是直接讓承接用的變數與被判斷的原變數同名，如此在各 `case` 述句下，原變數有如被轉型過了一般。
 
 ```go
 var t interface{}
