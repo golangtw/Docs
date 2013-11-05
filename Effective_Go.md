@@ -2,7 +2,7 @@
 
 - [Introduction](#introduction)
     - [Examples](#examples)
-- [Formatting](#formatting)
+- [格式](#formatting)
 - [Commentary](#commentary)
 - [Names](#names)
     - [Package names](#package-names)
@@ -74,25 +74,26 @@ This document gives tips for writing clear, idiomatic Go code. It augments the [
 
 The [Go package sources](http://golang.org/src/pkg/) are intended to serve not only as the core library but also as examples of how to use the language. Moreover, many of the packages contain working, self-contained executable examples you can run directly from the [golang.org](http://golang.org/) web site, such as [this onea](http://golang.org/pkg/strings/#example_Map) (if necessary, click on the word "Example" to open it up). If you have a question about how to approach a problem or how something might be implemented, the documentation, code and examples in the library can provide answers, ideas and background.
 
-##格式
+##<a name="formatting"></a>格式
 
 格式的問題最容易引起爭論同時也是最不重要的。人們可以適應各種不同的格式，但最好的情況是他們不需要這麼做，如果每個人都遵循相同的格式，就可以花更少的時間在這個議題上。問題在於要如何不透過冗長的規範手冊達到這樣的烏托邦境界。
 
 在Go中我們採用了一種不尋常的方法 - 讓機器處理大部分的格式問題。gofmt指令(也可以使用go fmt，它是在package層級運作而非source層級)可以讀取一份go程式並產出以標準格式縮排以及垂直排版的原始碼，保留注釋的格式，但有必要的話會重排。如果你想要知道如何處理一些新的編排狀況，執行gofmt;如果結果看起來不太對，重新整理你的程式(或是提交關於gofmt的bug)，不要使用能避開問題的替代方法。
 
 如同範例所示，不需要花時間對齊struct欄位後面的注釋。Gofmt會幫你處理。宣告一個struct
-
+```go
     type T struct {
         name string // 物件的名字
         value int // 它的值
     }
-
+```
 gofmt將會對齊欄位
-
+```go
     type T struct {
         name    string // 物件的名字
         value   int    // 它的值
     }
+```
 所有Go標準函式庫中的程式碼都使用了gofmt格式化。
 
 一些格式的細節仍然存在。簡單的說：
@@ -105,9 +106,9 @@ gofmt將會對齊欄位
 
 圓括號
     比起C與Java，Go需要的圓括號更少：控制結構(if, for, switch)在它們的語法中不需要圓括號。同樣的，運算子優先層級可以變得更短更清楚，所以
-    
+```go 
     x<<8 + y<<16
-
+```
 表示出間隔所暗示的意義，不像在其他語言裡一樣隱晦。
 
 ##Commentary
