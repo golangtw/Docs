@@ -2,7 +2,7 @@
 
 - [Introduction](#introduction)
     - [Examples](#examples)
-- [Formatting](#formatting)
+- [格式](#formatting)
 - [Commentary](#commentary)
 - [Names](#names)
     - [Package names](#package-names)
@@ -74,40 +74,42 @@ This document gives tips for writing clear, idiomatic Go code. It augments the [
 
 The [Go package sources](http://golang.org/src/pkg/) are intended to serve not only as the core library but also as examples of how to use the language. Moreover, many of the packages contain working, self-contained executable examples you can run directly from the [golang.org](http://golang.org/) web site, such as [this onea](http://golang.org/pkg/strings/#example_Map) (if necessary, click on the word "Example" to open it up). If you have a question about how to approach a problem or how something might be implemented, the documentation, code and examples in the library can provide answers, ideas and background.
 
-##Formatting
+##<a name="formatting"></a>格式
 
-Formatting issues are the most contentious but the least consequential. People can adapt to different formatting styles but it's better if they don't have to, and less time is devoted to the topic if everyone adheres to the same style. The problem is how to approach this Utopia without a long prescriptive style guide.
+格式的問題最容易引起爭論同時也是最不重要的。我們可以適應各種不同的格式，但最好的情況就是不用適應，如果每個人都遵循相同的格式，我們就可以花更少的時間在格式上。所以真正的問題在於要如何不透過冗長的規範手冊達到這樣的烏托邦境界。
 
-With Go we take an unusual approach and let the machine take care of most formatting issues. The gofmt program (also available as go fmt, which operates at the package level rather than source file level) reads a Go program and emits the source in a standard style of indentation and vertical alignment, retaining and if necessary reformatting comments. If you want to know how to handle some new layout situation, run gofmt; if the answer doesn't seem right, rearrange your program (or file a bug about gofmt), don't work around it.
+在 Go 中我們採用了一種不尋常的方法：讓機器處理大部分的格式問題。gofmt 指令（也可以使用 go fmt ，它是在 package 層級運作而非 source 層級）可以讀取一份 go 程式並產出以標準格式縮進以及垂直排版的原始碼，同時保留注釋的格式，但有必要的話會重排注釋。如果你想要知道如何處理一些從未見過的編排情況，執行 gofmt；如果結果看起來不太對，那就重新整理你的程式（或是提交關於 gofmt 的 bug ），不要使用能避開問題的替代方法。
 
-As an example, there's no need to spend time lining up the comments on the fields of a structure. Gofmt will do that for you. Given the declaration
-
+如同範例所示，不需要花時間對齊 struct 欄位後面的注釋。Gofmt 會幫你處理。宣告一個 struct
+```go
     type T struct {
-        name string // name of the object
-        value int // its value
+        name string // 物件的名字
+        value int // 它的值
     }
-
-gofmt will line up the columns:
-
+```
+gofmt 將會對齊欄位
+```go
     type T struct {
-        name    string // name of the object
-        value   int    // its value
+        name    string // 物件的名字
+        value   int    // 它的值
     }
+```
+所有 Go 標準函式庫中的程式碼都使用了 gofmt 格式化。
 
-All Go code in the standard packages has been formatted with gofmt.
+這裡還有一些細節需要注意。簡單來講：
 
-Some formatting details remain. Very briefly:
+縮進   
+    我們使用 tabs 做為縮進而且讓 gofmt 預設產出它。當真正需要時才使用空白。
 
-Indentation
-    We use tabs for indentation and gofmt emits them by default. Use spaces only if you must. 
-Line length
-    Go has no line length limit. Don't worry about overflowing a punched card. If a line feels too long, wrap it and indent with an extra tab. 
-Parentheses
-    Go needs fewer parentheses than C and Java: control structures (if, for, switch) do not have parentheses in their syntax. Also, the operator precedence hierarchy is shorter and clearer, so
+行長   
+    Go 沒有行的長度限制。不用擔心超過穿孔卡片。如果覺得某行太長，換行並且使用額外的縮進。
 
+圓括號   
+    比起C與Java，Go需要的圓括號更少：控制結構（if, for, switch）在它們的語法中不需要圓括號。同樣的，運算子優先層級可以變得更短更清楚，所以
+```go 
     x<<8 + y<<16
-
-means what the spacing implies, unlike in the other languages. 
+```
+可以明顯表示出間隔所暗示的意義，而不像在其他語言裡一樣隱晦。
 
 ##Commentary
 
