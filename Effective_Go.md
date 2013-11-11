@@ -2033,6 +2033,7 @@ The rest of the template string is just the HTML to show when the page loads. If
 
 And there you have it: a useful web server in a few lines of code plus some data-driven HTML text. Go is powerful enough to make a lot happen in a few lines. 
 
+---
 
 Build version go1.1.2.
 Except as noted, the content of this page is licensed under the Creative Commons Attribution 3.0 License, and code is licensed under a BSD license.
