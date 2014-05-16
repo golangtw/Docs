@@ -613,27 +613,27 @@ prints
 For programmers accustomed to block-level resource management from other languages, defer may seem peculiar, but its most interesting and powerful applications come precisely from the fact that it's not block-based but function-based. In the section on panic and recover we'll see another example of its possibilities.
 
 ##資料
-###new配置
+###`new`配置
 
-Go有兩種原生配置方法，內建函示 new 及 make。兩者存在差異並適用在不同的型別，這讓人混淆，但其實規則很簡單。先說有關 new。這是個內建函示，用來配置記憶體，但並不像其他語言中的new一樣，它並不會初始化記憶體，它只會給予空值。即是，new(T)爲新的T型別分配空的儲存並傳回其位址，配置出來的值是一個\*T的值。在Go術語裡，它傳回一個指標，指向一個新分配T型別的空值。
+Go有兩種原生配置方法，分別為內建函示`new`及`make`。這兩個方法有差異且適用於不同的型別，這容易讓人混淆，但其實規則很簡單。先說有關`new`。它是一種內建函示，用來配置記憶體。它不像其他語言中的`new`會*初始化*記憶體，它只會給予*空*值。意思是說，`new(T)`會爲`T`型別的新項目分配空的儲存空間，並且傳回其位址，配置出來的是一種`*T`值。在Go術語裡，它傳回的是一個指標，指向一個新分配的`T`型別空值。
 
-因為new傳回的記憶體是空值，當你在安排你設計的資料結構時很有幫助，因為每個型別都是空值，不需要進一步的初始化。意味著資料結構的使用者可以用new來新建並馬上使用。舉例來說，bytes.Buffer的文件陳述了"Buffer的空值是一種空的且可立即使用的緩衝區。" 同樣地，sync.Mutex沒有一個明確的建構子或Init方法。換句話說，sync.Mutex的空值定義成一種可解鎖的mutex。
+因為`new`傳回的記憶體是個空值，所以當你在安排你所設計的資料結構時很有幫助，因為每個型別都是空值，不需要進一步的初始化。意味著，資料結構的使用者可以用`new`來新建並馬上使用。舉例來說，`bytes.Buffer`的文件陳述了"`Buffer`的空值是一種空的且可立即使用的緩衝區。" 同樣地，`sync.Mutex`沒有一種明確的建構子或`Init`方法。換句話說，`sync.Mutex`的空值定義成一種未上鎖的mutex。
 
-空值有用的性質是有效的。考慮下列型別宣告。
+"空值可用"的性質是有用的。考慮下列型別宣告。
 
     type SyncedBuffer struct {
         lock    sync.Mutex
         buffer  bytes.Buffer
     }
 
-SyncBuffer型別的值可以分配之後立即使用或單純宣告它。下一個片段碼中，p 與 v 兩著都可以正常地運作，無需進一步的安排。
+`SyncBuffer`型別的值分配之後可以立即使用，或者只是單純宣告它。下一個片段碼中，`p`與`v`兩者都可以正常運作，無須進一步的安排。
 
-    p := new(SyncedBuffer)  // type *SyncedBuffer
-    var v SyncedBuffer      // type  SyncedBuffer
+    p := new(SyncedBuffer)  // *SyncedBuffer指標型別
+    var v SyncedBuffer      //  SyncedBuffer型別
 
-###建構子及字面值組合
+###建構子及字面合成
 
-有時候空值還不夠，初始建構子是必要的，如下範例，源自於os包。
+有時候只是空值還不夠，初始建構子是必要的，如下範例，源自於`os`包。
 
     func NewFile(fd int, name string) *File {
         if fd < 0 {
@@ -647,7 +647,7 @@ SyncBuffer型別的值可以分配之後立即使用或單純宣告它。下一�
         return f
     }
 
-這裡有很多樣板。我們可以用字面值組合來簡化它，字面值組合是一種表達式，每次賦值時都會建立一個新的實例。
+這裡有很多樣板。我們可以用字面合成來簡化它，字面合成是一種表達式，每次賦值時都會建立一個新的實例。
 
     func NewFile(fd int, name string) *File {
         if fd < 0 {
@@ -657,55 +657,55 @@ SyncBuffer型別的值可以分配之後立即使用或單純宣告它。下一�
         return &f
     }
 
-注意，這不像 C，回傳一個區域變數的位址是完全OK的；當這個函示傳回之後，這個變數的儲存空間仍然存活。事實上，每當賦值字面值組合取得位址時，都會分配一個新的實例，所以我們可以合併最後兩行。
+注意，這並不像C，這裡回傳一個區域變數的位址是完全OK的；當函示傳回之後，變數的儲存空間仍然存活著。實際上，每當賦值字面合成取得位址時，都會分配一個新的實例，所以我們可以合併最後兩行。
 
     return &File{fd, name, nil, 0}
 
-字面值組合的字段安排必須依照順序並且都必須出現。無論如何，明確地標上 field:value 組合的話，初始時就可呈現任何順序，缺少的就會用它們本身的空值初始。因此，我們可以說
+字面合成的字段必須依照順序排列，並且缺一不可。但如果是明確地標上`field:value`這種組合的話，初始時就可以無視順序，缺少的部份就會用它們本身的空值來初始化。因此，我們可以說
 
     return &File{fd: fd, name: name}
 
-如上限制性的例子，如果字面值組合沒有包含所有字段，它會建立該型別空值。new(File) 表達式與 &File{} 是相同的。
+如上述有限的例子中，字面合成並沒有包含所有的字段，它就會為該型別建立空值。`new(File)`表達式與`&File{}`是相同的。
 
-字面值組合也可以用來產生陣列、slice及map，而字段就用來表示索引或者map的鍵值。下列範例中，初始化了各個Enone、Eio及Einval值，只要它們是有區別的。
+字面合成也可以用來產生陣列、slice及map，而字段就用來表示索引或者map的鍵。下列範例中，初始化了`Enone`、`Eio`及`Einval`值，它們之間是有區別的。
 
     a := [...]string   {Enone: "no error", Eio: "Eio", Einval: "invalid argument"}
     s := []string      {Enone: "no error", Eio: "Eio", Einval: "invalid argument"}
     m := map[int]string{Enone: "no error", Eio: "Eio", Einval: "invalid argument"}
 
-###make配置
+###`make`配置
 
-回到配置。內建函式 make(T, args) 提供一種與 new(T) 不同的意圖。它只能用來產生slice、map及channel，而且它傳回T型別(非\*T型別)的值(非空值)。這個區別的意義在於這三個型別所表現的、底層的資料結構必須在使用前初始化完畢。舉例來說，slice是一種擁有三個項目描述子，包含一個指向資料(存在陣列中)的指標，長度及容量，直到這些項目初始化完畢前，slice是個nil。對於slice、map及channel而言，make初始了內部資料結構，並準備可用的值。例如，
+回到配置記憶體。內建函式`make(T, args)`提供一種與`new(T)`不同的意圖。它只能用來產生slice、map及channel，而且它傳回`T`型別(非`*T`型別)的值(非空值)。這個區別的意義在於，這三個型別呈現的、底層的資料結構必須在使用之前初始化完畢。舉例來說，slice是擁有三個項目描述子，包括指向資料(陣列)的指標，長度及容量，直到這些項目初始化完畢前，slice將會是個`nil`。對於slice、map及channel而言，`make`初始了內部資料結構，並準備可用的值。例如，
 
     make([]int, 10, 100)
 
-配置了一個有100個int的陣列，接著產生一個slice結構，長度為10及容量為100，指向陣列的前10個元素。(當產生一個slice時，容量是可以省略的；詳情請見slice章節。) 相較之下，new([]int) 傳回一個指標，指向一個新配置、空值的slice結構，也就是說，一個指向nil的slice value的指標。
+配置了一個有100個int的陣列，接著產生一個slice結構，長度為10及容量為100，指向陣列的前10個元素。(當產生一個slice時，容量是可以省略的；詳情請見slice章節。) 相較之下，`new([]int)`傳回一個指標，指向一個新配置、空值的slice結構，也就是說，一個指向`nil`的slice指標。
 
-接下來範例舉出了 new 與 make 之間的差異。
+接下來的範例舉出了`new`與`make`之間的差異。
 
     var p *[]int = new([]int)       // 配置slice結構；*p == nil; 很少有用
     var v  []int = make([]int, 100) // slice v 現在參考到一個有100個int的陣列
 
-    // 不必要的複雜：
+    // 複雜多餘：
     var p *[]int = new([]int)
     *p = make([]int, 100, 100)
 
-    // 慣用的:
+    // 慣用語法:
     v := make([]int, 100)
 
-記住make只適用在map、slice及channel並且不會傳回指標。用new配置明確地取得指標或對make的值取址來取得指標。
+記住`make`只適用在map、slice及channel，且不會傳回指標。`new`配置明確地取得指標，若要取得對`make`的值的指標，必須對值取址來取得指標。
 
 ###陣列
 
-陣列非常有用，當你計畫著記憶體的詳細布局，有些時候可以幫助避免配置，但主要是用來為slice建造區塊，這是下一章節的主題。為了該章節鋪設一些基礎，這裡有些關於陣列的兩三語。
+當你計畫著記憶體的詳細布局時，陣列非常有用，有時候可以避免記憶體配置，但主要是用來做slice的建造區塊，這是下一章節的主題。為了這個章節，需要先鋪設一些基礎，這裡有些關於陣列的兩三語。
 
-這裡有些陣列運作的差異在 Go 與 C 之間。在Go中，
+下列是Go與C之間陣列運作的差異。在Go中，
 
-- 陣列即值。指定陣列到另一個陣列，將會複製所有的元素內容。
-- 尤其是，如果你傳遞參數到函數，函數將會收到陣列的副本，而不是指向它的指標
-- 陣列尺寸是陣列本身的一種型別。[10]int型別 與 [20]int型別 是不同的。
+- 陣列就是個值。指定陣列到另一個陣列，將會複製所有的元素內容。
+- 尤其是，如果你在函數參數傳遞到陣列，函數內會使用陣列的副本，而不是指向陣列的指標
+- 尺寸也是一種陣列型別。`[10]int`型別與`[20]int`型別是不同的。
 
-值的性質可以非常有用，但也很昂貴；如果你想要像C一樣的行為及效率，你可以傳遞指標到陣列之中。
+值的性質可以非常有用，但也很昂貴；如果你想要像C同樣的行為及效率，你可以傳遞陣列的指標。
 
     func Sum(a *[3]float64) (sum float64) {
         for _, v := range *a {
@@ -721,22 +721,22 @@ SyncBuffer型別的值可以分配之後立即使用或單純宣告它。下一�
 
 ###Slice
 
-Slice包裝陣列，給予了連續資料更廣泛、強大且方便的界面，除了項目明確的維度，諸如矩陣轉置，大多Go裡面的陣列程式設計是用slice來完成而非單純的陣列。
+Slice包裝陣列，給予了連續資料更廣泛、強大且方便的界面，除了項目有明確的維度，如矩陣轉置之外，Go裡面大多的陣列程式設計都是用slice來完成，而非一般的陣列。
 
-Slice持有底層陣列的參考，如果你將slice指定到另一個slice，兩著參考到相同的陣列。如果某個函式接受slice參數，元素的修改也會反應到呼叫者本身的slice，類似於傳遞指向底層陣列的指標。Read函式接受slice參數而不是指標及數量；slice內的長度設定了多少資料可以讀取的上限。下列是os包內File型別的Read方法的函數簽名：
+Slice持有底層陣列的參考，如果你將slice指定到另一個slice，兩著會參考到相同的陣列。如果某個函式接受slice參數，元素的修改也會反應到呼叫者本身的slice，類似於傳遞指向底層陣列的指標。`Read`函式接受slice參數而不是指標及數量；slice內的長度設定了多少資料可以讀取的上限。下列是`File`型別的`Read`方法的函數簽名，源自`os`包：
 
     func (file *File) Read(buf []byte) (n int, err error)
 
-此方法回傳讀取了多少bytes以，如果錯誤發生的話，傳回錯誤值。下列示範從一個大的緩衝 b 讀取前 32 bytes，對緩衝進行切片。
+此方法回傳讀取了多少bytes，如果錯誤發生的話，傳回錯誤值。下列示範從一個大的緩衝`b`讀取前32個bytes，進行緩衝切片。
 
         n, err := f.Read(buf[0:32])
 
-這類的切片是常見且有效率的。事實上，先不管效率，下列片段碼也會讀取緩衝的前 32 bytes。
+這類的切片常見且有效率。實際上，先不管效率，下列片段碼也會讀取緩衝的前32個bytes。
 
     var n int
     var err error
     for i := 0; i < 32; i++ {
-        nbytes, e := f.Read(buf[i:i+1])  // 讀取一個byte.
+        nbytes, e := f.Read(buf[i:i+1])  // 讀取1個byte.
         if nbytes == 0 || e != nil {
             err = e
             break
@@ -744,7 +744,7 @@ Slice持有底層陣列的參考，如果你將slice指定到另一個slice，�
         n += nbytes
     }
 
-可以不斷slice的長度改變，只要仍符合底層陣列的限制；只要一直指派slice本身。slice的容量可以透過內建函式 cap 來存取，回報slice的最大長度。這裡有個函式用來附加資料到slice之中。如果超過容量，slice將會重新配置。新的slice會被傳回。這個函式可以用在nil的slice並且傳回0。
+slice的長度可以不斷的改變，只要符合底層陣列的上限；重複指派slice本身。slice的*容量*可以透過內建函式`cap`來存取，回報slice的最大長度。這裡有個函式用來附加資料到slice。如果超過容量，slice將會重新配置。新的slice會被傳回。這個函式可以用在`nil`的slice並且傳回0。
 
     func Append(slice, data[]byte) []byte {
         l := len(slice)
@@ -765,16 +765,16 @@ Slice持有底層陣列的參考，如果你將slice指定到另一個slice，�
 我們最終必須回傳slice，因為，儘管Append可以修改slice內的元素，但是slice(執行時期的資料結構，持有著指標、長度及容量)是透過傳值方式傳入。  
 (譯註：Append函式是以傳值方式傳遞slice，而非傳址，修改的結果需要反應到呼叫者)
 
-附加在slice的主意非常有用，它被內建append函式捕獲。進一步了解函式的設計、想法，我們需要一些些額外資訊，所以稍候再回來。
+附加在slice的這個主意非常有幫助，獲得內建append函式的青睞。為了進一步了解函式的設計、想法，我們需要一些些額外資訊，所以稍候再回來。
 
 ###二維slice
 
 Go的陣列及slice都是一維的。若要產生二維的陣列或slice，需要定義一個陣列的陣列或slice的slice，像是：
 
     type Transform [3][3]float64  // 3x3陣列，真正的陣列的陣列。
-    type LinesOfText [][]byte     // slice中有byte slice。
+    type LinesOfText [][]byte     // 一個slice中每個元素都是byte slice。
 
-因為slice是動態長度，所以每個內部的slice都可能是不同長度。這是個常見狀況，如同我們上述的LinesOfText：每一行都有獨立長度。
+因為slice是動態長度，所以每個內部的slice都可能是不同長度。這個狀況很常見，如同我們上述的`LinesOfText`：每行都有各自的文字長度。
 
     text := LinesOfText{
         []byte("Now is the time"),
@@ -782,7 +782,7 @@ Go的陣列及slice都是一維的。若要產生二維的陣列或slice，需�
         []byte("to bring some fun to the party."),
     }
 
-某些時候有必要配置一個二維slice，例如，這種況會發生在，當你要掃描處理每行像素的時候。有兩個方式可以達到需求。一種是獨立地的為每個slice配置；另一個是配置一個一維陣列，並將各個slice的指標存入陣列元素。使用哪種方式，取決於你的應用程式。如果slice會成長或收縮，那應該用獨立地的配置來避免覆寫下一行；如果不是，那建立一個物件只有單一配置會來得有效率一點。以下兩個方法的草圖供參考。首先，一次一行：
+有些時候有必須配置二維slice，例如，這種狀況會發生在，當你要掃描處理每行像素的時候。兩個可以達到需求的方式。一是獨立地的為每個slice配置；另一個是配置一個一維陣列，並將各個slice的指標存入該陣列元素中。至於要使用哪種方式，取決於你的應用程式。如果slice會成長或收縮，那就應該用獨立地的配置來避免覆寫到下一行的內容；如果不是，那建立一個物件只有單一配置會來得有效率一點。以下兩個方法的草圖供您參考。首先，一次一行：
 
     // 配置最上層slice。
     picture := make([][]uint8, YSize) // 每一行都有y個單位。
@@ -791,22 +791,22 @@ Go的陣列及slice都是一維的。若要產生二維的陣列或slice，需�
         picture[i] = make([]uint8, XSize)
     }
 
-接著是，一個配置，And now as one allocation, sliced into lines:
+另一種，一個配置，根據每行進行切片：
 
     // 配置最上層slice，相同於上個範例。
     picture := make([][]uint8, YSize) // 每一行都有y個單位。
     // 配置一個大的slice，持有所有像素。
     pixels := make([]uint8, XSize*YSize) // 這裡用[]uint8型別，儘管picture的是[][]uint8型別。
-    // 循環每一行，從剩下的pixels開頭切出每一行的長度到每一行
+    // 循環每一行，從剩下的pixels開頭切出每一行的長度的切片
     for i := range picture {
         picture[i], pixels = pixels[:XSize], pixels[XSize:]
     }
 
 ###Map
 
-Map是種方便且強大的內建資料結構，聯繫著某個型別的值(鍵)對應另一個型別的值(元素或值)。鍵可以是任何已經定義等號操作子的型別，例如整數、浮點數、複數、字串、指標、界面(只要動態型別支援等號)、結構及陣列。Slice不能成為Map的鍵，因為它沒有定義等號。如同slice，map持有底層資料結構的參考。如果你傳遞map到函式，函式內對map的內容的修改，也會反應到呼叫者。
+Map是種方便且強大的內建資料結構，每個型別的值(鍵)聯繫對應著另一個型別的值(元素或值)組成一對。鍵可以是任何已經定義等號操作子的型別，例如整數、浮點數、複數、字串、指標、界面(只要動態型別支援等號)、結構及陣列。slice型別並不能成為Map的鍵，因為它沒有定義等號。如同slice，map持有底層資料結構的參考。如果你傳遞map到函式之中，函式內對map的內容的修改，也會反應到呼叫者。
 
-Map通常使用字面值組合語法來建構，語法是一種冒號分隔的鍵與值成對組合，所以在初始化時很容易建造它們。
+Map通常使用字面合成的語法來建構，語法是一種冒號分隔的鍵與值成對組合，所以在初始化時很容易建造它們。
 
     var timeZone = map[string]int{
         "UTC":  0*60*60,
@@ -816,11 +816,11 @@ Map通常使用字面值組合語法來建構，語法是一種冒號分隔的�
         "PST": -8*60*60,
     }
 
-指派或取得map值看似語意的，只要用像是陣列或slice方式，除了索引值並不一定是整數。
+指派或取得map值看似語意的，只要用類似陣列或slice方式來存取，只是索引值並不一定是整數。
 
     offset := timeZone["EST"]
 
-嘗試取得不存在的鍵時，map會傳回該鍵型別的空值。例如，如果map包含了整數，查找一個不存在的鍵，將會傳回0。集合可以用map來實作，其值的型別為布林值。設定map條目成true來放入某個值到集合內，接著透過簡單的索引來測試它。
+嘗試取得不存在的鍵時，map會傳回該鍵型別的空值。例如，如果map包含了整數，查找一個不存在的鍵，將會傳回`0`。集合可以用map來實作，其值的型別為布林值。設定map條目成`true`來放入某個值到集合內，接著透過簡單的索引來測試它。
 
     attended := map[string]bool{
         "Ann": true,
@@ -832,13 +832,13 @@ Map通常使用字面值組合語法來建構，語法是一種冒號分隔的�
         fmt.Println(person, "was at the meeting")
     }
 
-有時你需要分辨「條目是否存在」與「條目儲存的值是否為零」之間的不同。以下例來說，map 裡 "UTC" 這個條目值本來就是零？或其實根本不存在 "UTC" 這個條目？我們可以用多重指派形式來區別這兩種情況。
+有時你需要分辨「條目是否存在」與「條目儲存的值是否為零」之間的不同。以下例來說，map裡`"UTC"`這個條目值本來就是零？或其實根本不存在`"UTC"`這個條目？我們可以用多重指派形式來區別這兩種情況。
 
     var seconds int
     var ok bool
     seconds, ok = timeZone[tz]
 
-很明顯地，這個用法的習慣用語叫做“comma ok”。在這個範例中，如果tz存在，seconds將會適當地的設定，而ok將會是true；如果不存在，sconeds將會被設定為空值，而ok將會是false。下列這個函式將它們放在一起，帶有良好的錯誤報告：
+很明顯地，這個用法的習慣用語叫做“comma ok”。在這個範例中，如果`tz`存在，`seconds`將會適當地的設定，而`ok`將會是`true`；如果不存在，`sconeds`將會被設定為空值，而`ok`將會是`false`。下列這個函式將它們放在一起，帶有良好的錯誤報告：
 
     func offset(tz string) int {
         if seconds, ok := timeZone[tz]; ok {
@@ -848,28 +848,28 @@ Map通常使用字面值組合語法來建構，語法是一種冒號分隔的�
         return 0
     }
 
-測試是否存在於map中而不關心實際的值是什麼，你可以用空白識別符號 (_) 來取代本來要用來存放值的變數。
+只想測試是否存在於map中，實際的值並不關心時，你可以用[空白識別符號](#blank) (`_`) 來取代本來要用來存放值的變數。
 
     _, present := timeZone[tz]
 
-若要刪除map條目，使用內建函式 delete，參數為 map 及要刪除的 鍵。這是安全的作法，甚至鍵已經不存在map內。
+若要刪除map條目，使用內建函式`delete`，參數為map實例及要刪除的鍵。這是個安全的作法，甚至鍵已經不存在map內。
 
     delete(timeZone, "PDT")  // 現在是標準時間
 
 ###印出
 
-Go中格式化輸出使用一種相似於C的printf家族風格，但更加豐富且廣泛。函式存放在fmt包，並且為字母大寫：fmt.Printf、fmt.Fprintf、fmt.Sprintf等。字串函式(Sprintf等)傳回一個字串，而不是填放在所提供的緩衝中。
+Go的格式化輸出是使用一種相似於C的`printf`家族風格，但更加地豐富且廣泛。函式存放在`fmt`包，並且為字母大寫：`fmt.Printf`、`fmt.Fprintf`、`fmt.Sprintf`等。字串函式(`Sprinf`等)傳回一個字串，而不是填放在所提供的緩衝中。
 
-你可以不需要提供格式字串。每個Printf、Fprintf及Sprintf都有另一對函式存在，例如Print及Println。這些函式不需要格式字串，而是用預設格式來產生。Print版本會在每個字串型別參數之間，加上空白，Println版本也會在插入空行。下列範例每一行都會產生相同輸出。
+你可以不需要提供格式字串。每個`Printf`、`Fprintf`及`Sprintf`都有另一對函式存在，例如`Print`及`Println`。這些函式不需要格式字串，而是用預設格式來產生。`Print`版本會在每個字串型別參數之間，加上空白，`Println`的版本會插入空行。下列範例每一行都會產生相同的結果。
 
     fmt.Printf("Hello %d\n", 23)
     fmt.Fprint(os.Stdout, "Hello ", 23, "\n")
     fmt.Println("Hello", 23)
     fmt.Println(fmt.Sprint("Hello ", 23))
 
-格式化印出函式 fmt.Fprint 及相關函式，接受第一個參數可以是任何實作 io.Writer 界面的物件；變數 os.Stdout 及 os.Stderr 都是熟悉的實例。
+格式化印出函式`fmt.Fprint`及相關函式，接受第一個參數可以是任何實作`io.Writer`界面的物件；變數`os.Stdout`及`os.Stderr`都是我們所熟悉的實例。
 
-這裡是與C分叉的開始。首先，數字的格式如%d並不接受有號無號數或者尺寸的旗標；取而代之的是，利用參數型別來決定該性質。
+這裡是與C分叉的開始。首先，數字的格式如`%d`並不接受有號無號數或者尺寸的旗標；取而代之的是，利用參數型別來決定該性質。
 
     var x uint64 = 1<<64 - 1
     fmt.Printf("%d %x; %d %x\n", x, x, int64(x), int64(x))
@@ -878,7 +878,7 @@ Go中格式化輸出使用一種相似於C的printf家族風格，但更加豐�
 
     18446744073709551615 ffffffffffffffff; -1 -1
 
-如果你只是想要預設轉換，例如十進位顯示整數，你可以用包羅萬象的格式%v(v表示value)；結果會跟Print與Println產生的一模一樣。此外，這個格式可以印出任何值，甚至是陣列、slice、結構及map。下列範例印出前個章節定義的時間區間的map。
+如果你只是想要預設轉換，例如十進位顯示整數，你可以用包羅萬象的格式`%v`(v表示value)；結果會跟`Print`與`Println`一模一樣。此外，這個格式可以印出任何值，甚至是陣列、slice、結構及map。下列範例印出前個章節定義的時間區間的map。
 
 fmt.Printf("%v\n", timeZone)  // 或者用 fmt.Println(timeZone)
 
@@ -886,7 +886,7 @@ fmt.Printf("%v\n", timeZone)  // 或者用 fmt.Println(timeZone)
 
     map[CST:-21600 PST:-28800 EST:-18000 UTC:0 MST:-25200]
 
-當然，map內的鍵會以任何順序呈現。當印出一個結構時，修改版的格式 %+v 評註字段名在結果中，其他任何的值，也可以用替代格式 %#v 印出以顯示完整的值，並以Go語句呈現。
+當然，map內的鍵會以任何順序呈現。當印出一個結構時，修改版的格式`%+v`會在結果中評註字段名，其他任何的值，也可以用替代格式`%#v`印出以顯示完整的值，並以Go語句呈現。
 
     type T struct {
         a int
@@ -906,10 +906,9 @@ fmt.Printf("%v\n", timeZone)  // 或者用 fmt.Println(timeZone)
     &main.T{a:7, b:-2.35, c:"abc\tdef"}
     map[string] int{"CST":-21600, "PST":-28800, "EST":-18000, "UTC":0, "MST":-25200}
 
-(注意&符號。) 當應用在字串型別或[]byte型別的值時，也可以透過 %q 來印出雙引號字串格式。替代格式 %#q 將會使用倒引號取代。(%q 格式也適用於整數及rune型別，產生出一個單引號包住的 rune常數。) 並且，%x 可以用在字串、byte陣列、byte slice及整數，產生出一個十六進位表示的長字串, 若帶有空白在格式中 (% x)，它將會在每個bytes之間加上空白。
+(注意&符號。) 當應用在字串型別或`[]byte`型別的值時，也可以透過`%q`來印出雙引號字串格式。替代格式`%#q`將會使用倒引號(`\``)取代。(`%q`格式也適用於整數及`rune`型別，產生出一個單引號包住的`rune`常數。) 並且，`%x`可以用在字串、byte陣列、byte slice及整數，產生出一個十六進位表示的長字串, 若帶有空白在格式中 (`% x`)，它將會在每個bytes之間加上空白。
 
-
-另一個便利的格式為 %T，印出值的型別。
+另一個便利的格式為`%T`，印出值的型別。
 
     fmt.Printf("%T\n", timeZone)
 
@@ -917,7 +916,7 @@ fmt.Printf("%v\n", timeZone)  // 或者用 fmt.Println(timeZone)
 
     map[string] int
 
-如果你想要控制自訂型別的預設格式，只需要定義一個 String() string 簽名的函式於該型別中。舉例一個簡單T型別，看起來如下。
+如果你想要控制自訂型別的預設格式，只需要定義一個`String() string`簽名的函式於該型別中。舉例一個簡單`T`型別，看起來如下。
 
     func (t *T) String() string {
         return fmt.Sprintf("%d/%g/%q", t.a, t.b, t.c)
@@ -928,9 +927,9 @@ fmt.Printf("%v\n", timeZone)  // 或者用 fmt.Println(timeZone)
 
     7/-2.35/"abc\tdef"
 
-(如果你需要印出T型別的值，以及T型別的指標，String方法的接收者必須是該型別值；上列範例使用指標是因為這樣比較有效率，也是結構型別的慣用方法。詳細請見下方 pointers vs. value receivers 章節)
+(如果你需要印出`T`型別的值，以及`T`型別的指標，`String`方法的接收者必須是該型別值；上列範例使用指標是因為這樣比較有效率，也是結構型別的慣用方法。詳細請見下方 pointers vs. value receivers 章節)
 
-我們的String方法允許呼叫Sprintf，因為印出程序完全再進入，而且可以這樣包裝。另外關於這個方法有個重要的細節需要了解，無論如何：不要在String方法內呼叫Sprintf，它會不確定地重新進到你的String方法。這將會發生在當呼叫Sprintf時，直接將接收者當作字串直接印出，這樣一來會再一次調用方法。這是個常見且容易犯的錯誤，如下範例所示。
+我們的`String`方法允許呼叫`Sprintf`，因為印出程序完全再進入，而且可以這樣包裝。另外關於這個方法有個重要的細節需要了解，無論如何：不要在`String`方法內呼叫`Sprintf`，它會不確定地重新進到你的`String`方法。這將會發生在當呼叫`Sprintf`時，直接將接收者當作字串直接印出，這樣一來會再一次調用方法。這是個常見且容易犯的錯誤，如下範例所示。
 
     type MyString string
 
@@ -938,7 +937,7 @@ fmt.Printf("%v\n", timeZone)  // 或者用 fmt.Println(timeZone)
         return fmt.Sprintf("MyString=%s", m) // 錯誤：將會永遠重新復發。
     }
 
-這也很容易解決：轉換參數成基本的字串型別，基本的字串型別沒有String方法。
+這問題很容易解決：轉換參數成基本的字串型別，基本的字串型別沒有`String`方法。
 
     type MyString string
     func (m MyString) String() string {
@@ -947,23 +946,22 @@ fmt.Printf("%v\n", timeZone)  // 或者用 fmt.Println(timeZone)
 
 在initialization章節我們將會看到其他技巧來避免這樣的遞迴。
 
-
-另一種印出技巧是傳遞某個印出程序直地給另一個程序。Printf的簽名使用 ...interface{} 型別作為其最終參數，指定了任意長度的參數(任意型別)，可以在顯示格式之後。
+另一種印出技巧是傳遞某個印出程序直地給另一個程序。`Printf`的簽名使用`...interface{}`型別作為其最終參數，指定了任意長度的參數(任意型別)，可以在顯示格式之後。
 
     func Printf(format string, v ...interface{}) (n int, err error) {
 
-在 Printf 函式之中，v 產生一個參數，其型別為 []interface{} ，但如果它傳遞到另一個接受任意長度參數的函式，那它就會產生像個一般常規的參數清單。下列範例是我們稍早用到的 log.Println 函式實作。它將它自己的參數直接傳遞到 fmt.Sprintln 以達到實際的字串格式化。
+在`Printf`函式之中，`v`產生一個參數，其型別為`[]interface{}`，但如果它傳遞到另一個接受任意長度參數的函式，那它就會產生像個一般常規的參數清單。下列範例是我們稍早用到的 `log.Println`函式實作。它將它自己的參數直接傳遞到`fmt.Sprintln`以達到實際的字串格式化。
 
     // Println 當下使用 fmt.Println 將結果印出到標準紀錄者。
     func Println(v ...interface{}) {
         std.Output(2, fmt.Sprintln(v...))  // 用參數做輸出 (int, string)
     }
 
-我們在呼叫Sprintln的參數v後面加上...，告訴編譯器將v視為一種參數清單；否則它將會將v當作一個slice參數傳遞。
+我們在呼叫`Sprintln`的參數`v`後面加上`...`，告訴編譯器將`v`視為一種參數清單；否則它將會將`v`當作一個slice參數傳遞。
 
-還有更多我們這裡沒有涵蓋到的印出方式。請見fmt包在godoc文件中的詳細說明。
+還有更多我們這裡沒有涵蓋到的印出方式。請見`fmt`包在godoc文件中的詳細說明。
 
-順便提及，... 參數可以是特定型別，例如，min函式的 ...int 將會選出整數清單內最小的值：
+順便提及，`...`參數可以是特定型別，例如，`min`函式的`...int`將會選出整數清單內最小的值：
 
     func Min(a ...int) int {
         min := int(^uint(0) >> 1)  // 最大整數
@@ -977,28 +975,28 @@ fmt.Printf("%v\n", timeZone)  // 或者用 fmt.Println(timeZone)
 
 ###附加
 
-現在，我們有個遺失的片段，就是需要解釋內建append函式的設計。append函式簽名跟我們上述的Append函式不同。概要地，它看起來是：
+現在，我們有個遺失的片段，就是需要解釋內建`append`函式的設計。`append`函式簽名跟我們上述的`Append`函式不同。概要地，它看起來是：
 
     func append(slice []T, elements ...T) []T
 
-其中 T 是一個佔位符，表示任何型別。你實際上無法在Go中寫出一個函式，其T型別是由呼叫者來決定。這就是為何它是內建的：它必須由編譯器來支援。
+其中`T`是一個佔位符，用來表示任何型別。你實際上無法在Go中寫出一個函式，其`T`型別是由呼叫者來決定。這就是為何它是內建的：它必須由編譯器來支援。
 
-append就是將資料附加到slice最後並傳回結果。結果必須回傳，因為如同我們自己手寫的Append，底層陣列可能會改變。這是個幾單範例
+`append`就是將資料附加到slice最後並傳回結果。結果必須回傳，因為如同我們自己手寫的`Append`，底層陣列可能會改變。這是個簡單範例
 
     x := []int{1,2,3}
     x = append(x, 4, 5, 6)
     fmt.Println(x)
 
-印出 [1 2 3 4 5 6]。所以append運作有點像Printf，收集任意長度的參數。
+印出`[1 2 3 4 5 6]`。所以`append`運作有點像`Printf`，收集任意長度的參數。
 
-但是，如果我們想要像Append做的事情一樣，附加一個slice到sliec呢？簡單：在呼叫端使用 ... ，如同我們在上述的輸出所做一樣。下列片段碼產生跟上一個例子一樣的結果。
+但是，如果我們想要像`Append`做的事情一樣，附加一個slice到slice之中呢？簡單：在呼叫端使用`...`，如同我們在上述的輸出所做一樣。下列片段碼產生跟上一個例子一樣的結果。
 
     x := []int{1,2,3}
     y := []int{4,5,6}
     x = append(x, y...)
     fmt.Println(x)
 
-如果沒有 ... ，將無法通過編譯，因為型別會錯；y 不是int型別。
+如果沒有`...`，將無法通過編譯，因為型別會錯；`y`不是`int`型別。
 
 ##Initialization
 
