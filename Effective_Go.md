@@ -20,16 +20,16 @@
     - [Multiple return values](#multiple-return-values)
     - [Named result parameters](#named-result-parameters)
     - [Defer](#defer)
-- [Data](#data)
-    - [Allocation with new](#allocation-with-new)
-    - [Constructors and composite literals](#constructors-and-composite-literals)
-    - [Allocation with make](#allocation-with-make)
-    - [Arrays](#arrays)
-    - [Slices](#slices)
-    - [Two-dimensional slices](#two-dimensional-slices)
-    - [Maps](#maps)
-    - [Printing](#printing)
-    - [Append](#append)
+- [資料](#data)
+    - [new配置](#allocation-with-new)
+    - [建構子及字面值組合](#constructors-and-composite-literals)
+    - [make配置](#allocation-with-make)
+    - [陣列](#arrays)
+    - [Slice](#slices)
+    - [二維slice](#two-dimensional-slices)
+    - [Map](#maps)
+    - [印出](#printing)
+    - [附加](#append)
 - [Initialization](#initialization)
     - [Constants](#constants)
     - [Variables](#variables)
@@ -612,28 +612,28 @@ prints
 
 For programmers accustomed to block-level resource management from other languages, defer may seem peculiar, but its most interesting and powerful applications come precisely from the fact that it's not block-based but function-based. In the section on panic and recover we'll see another example of its possibilities.
 
-##Data
-###Allocation with new
+##資料
+###`new`配置
 
-Go has two allocation primitives, the built-in functions new and make. They do different things and apply to different types, which can be confusing, but the rules are simple. Let's talk about new first. It's a built-in function that allocates memory, but unlike its namesakes in some other languages it does not initialize the memory, it only zeros it. That is, new(T) allocates zeroed storage for a new item of type T and returns its address, a value of type *T. In Go terminology, it returns a pointer to a newly allocated zero value of type T.
+Go有兩種原生配置方法，分別為內建函示`new`及`make`。這兩個方法有差異且適用於不同的型別，這容易讓人混淆，但其實規則很簡單。先說有關`new`。它是一種內建函示，用來配置記憶體。它不像其他語言中的`new`會*初始化*記憶體，它只會給予*空*值。意思是說，`new(T)`會爲`T`型別的新項目分配空的儲存空間，並且傳回其位址，配置出來的是一種`*T`值。在Go術語裡，它傳回的是一個指標，指向一個新分配的`T`型別空值。
 
-Since the memory returned by new is zeroed, it's helpful to arrange when designing your data structures that the zero value of each type can be used without further initialization. This means a user of the data structure can create one with new and get right to work. For example, the documentation for bytes.Buffer states that "the zero value for Buffer is an empty buffer ready to use." Similarly, sync.Mutex does not have an explicit constructor or Init method. Instead, the zero value for a sync.Mutex is defined to be an unlocked mutex.
+因為`new`傳回的記憶體是個空值，所以當你在安排你所設計的資料結構時很有幫助，因為每個型別都是空值，不需要進一步的初始化。意味著，資料結構的使用者可以用`new`來新建並馬上使用。舉例來說，`bytes.Buffer`的文件陳述了"`Buffer`的空值是一種空的且可立即使用的緩衝區。" 同樣地，`sync.Mutex`沒有一種明確的建構子或`Init`方法。換句話說，`sync.Mutex`的空值定義成一種未上鎖的mutex。
 
-The zero-value-is-useful property works transitively. Consider this type declaration.
+"空值可用"的性質是有用的。考慮下列型別宣告。
 
     type SyncedBuffer struct {
         lock    sync.Mutex
         buffer  bytes.Buffer
     }
 
-Values of type SyncedBuffer are also ready to use immediately upon allocation or just declaration. In the next snippet, both p and v will work correctly without further arrangement.
+`SyncBuffer`型別的值分配之後可以立即使用，或者只是單純宣告它。下一個片段碼中，`p`與`v`兩者都可以正常運作，無須進一步的安排。
 
-    p := new(SyncedBuffer)  // type *SyncedBuffer
-    var v SyncedBuffer      // type  SyncedBuffer
+    p := new(SyncedBuffer)  // *SyncedBuffer指標型別
+    var v SyncedBuffer      //  SyncedBuffer型別
 
-###Constructors and composite literals
+###建構子及字面合成
 
-Sometimes the zero value isn't good enough and an initializing constructor is necessary, as in this example derived from package os.
+有時候只是空值還不夠，初始建構子是必要的，如下範例，源自於`os`包。
 
     func NewFile(fd int, name string) *File {
         if fd < 0 {
@@ -647,7 +647,7 @@ Sometimes the zero value isn't good enough and an initializing constructor is ne
         return f
     }
 
-There's a lot of boiler plate in there. We can simplify it using a composite literal, which is an expression that creates a new instance each time it is evaluated.
+這裡有很多樣板。我們可以用字面合成來簡化它，字面合成是一種表達式，每次賦值時都會建立一個新的實例。
 
     func NewFile(fd int, name string) *File {
         if fd < 0 {
@@ -657,55 +657,55 @@ There's a lot of boiler plate in there. We can simplify it using a composite lit
         return &f
     }
 
-Note that, unlike in C, it's perfectly OK to return the address of a local variable; the storage associated with the variable survives after the function returns. In fact, taking the address of a composite literal allocates a fresh instance each time it is evaluated, so we can combine these last two lines.
+注意，這並不像C，這裡回傳一個區域變數的位址是完全OK的；當函示傳回之後，變數的儲存空間仍然存活著。實際上，每當賦值字面合成取得位址時，都會分配一個新的實例，所以我們可以合併最後兩行。
 
     return &File{fd, name, nil, 0}
 
-The fields of a composite literal are laid out in order and must all be present. However, by labeling the elements explicitly as field:value pairs, the initializers can appear in any order, with the missing ones left as their respective zero values. Thus we could say
+字面合成的字段必須依照順序排列，並且缺一不可。但如果是明確地標上`field:value`這種組合的話，初始時就可以無視順序，缺少的部份就會用它們本身的空值來初始化。因此，我們可以說
 
     return &File{fd: fd, name: name}
 
-As a limiting case, if a composite literal contains no fields at all, it creates a zero value for the type. The expressions new(File) and &File{} are equivalent.
+如上述有限的例子中，字面合成並沒有包含所有的字段，它就會為該型別建立空值。`new(File)`表達式與`&File{}`是相同的。
 
-Composite literals can also be created for arrays, slices, and maps, with the field labels being indices or map keys as appropriate. In these examples, the initializations work regardless of the values of Enone, Eio, and Einval, as long as they are distinct.
+字面合成也可以用來產生陣列、slice及map，而字段就用來表示索引或者map的鍵。下列範例中，初始化了`Enone`、`Eio`及`Einval`值，它們之間是有區別的。
 
     a := [...]string   {Enone: "no error", Eio: "Eio", Einval: "invalid argument"}
     s := []string      {Enone: "no error", Eio: "Eio", Einval: "invalid argument"}
     m := map[int]string{Enone: "no error", Eio: "Eio", Einval: "invalid argument"}
 
-###Allocation with make
+###`make`配置
 
-Back to allocation. The built-in function make(T, args) serves a purpose different from new(T). It creates slices, maps, and channels only, and it returns an initialized (not zeroed) value of type T (not *T). The reason for the distinction is that these three types represent, under the covers, references to data structures that must be initialized before use. A slice, for example, is a three-item descriptor containing a pointer to the data (inside an array), the length, and the capacity, and until those items are initialized, the slice is nil. For slices, maps, and channels, make initializes the internal data structure and prepares the value for use. For instance,
+回到配置記憶體。內建函式`make(T, args)`提供一種與`new(T)`不同的意圖。它只能用來產生slice、map及channel，而且它傳回`T`型別(非`*T`型別)的值(非空值)。這個區別的意義在於，這三個型別呈現的、底層的資料結構必須在使用之前初始化完畢。舉例來說，slice是擁有三個項目描述子，包括指向資料(陣列)的指標，長度及容量，直到這些項目初始化完畢前，slice將會是個`nil`。對於slice、map及channel而言，`make`初始了內部資料結構，並準備可用的值。例如，
 
     make([]int, 10, 100)
 
-allocates an array of 100 ints and then creates a slice structure with length 10 and a capacity of 100 pointing at the first 10 elements of the array. (When making a slice, the capacity can be omitted; see the section on slices for more information.) In contrast, new([]int) returns a pointer to a newly allocated, zeroed slice structure, that is, a pointer to a nil slice value.
+配置了一個有100個int的陣列，接著產生一個slice結構，長度為10及容量為100，指向陣列的前10個元素。(當產生一個slice時，容量是可以省略的；詳情請見slice章節。) 相較之下，`new([]int)`傳回一個指標，指向一個新配置、空值的slice結構，也就是說，一個指向`nil`的slice指標。
 
-These examples illustrate the difference between new and make.
+接下來的範例舉出了`new`與`make`之間的差異。
 
-    var p *[]int = new([]int)       // allocates slice structure; *p == nil; rarely useful
-    var v  []int = make([]int, 100) // the slice v now refers to a new array of 100 ints
+    var p *[]int = new([]int)       // 配置slice結構；*p == nil; 很少有用
+    var v  []int = make([]int, 100) // slice v 現在參考到一個有100個int的陣列
 
-    // Unnecessarily complex:
+    // 複雜多餘：
     var p *[]int = new([]int)
     *p = make([]int, 100, 100)
 
-    // Idiomatic:
+    // 慣用語法:
     v := make([]int, 100)
 
-Remember that make applies only to maps, slices and channels and does not return a pointer. To obtain an explicit pointer allocate with new or take the address of a variable explicitly.
+記住`make`只適用在map、slice及channel，且不會傳回指標。`new`配置明確地取得指標，若要取得對`make`的值的指標，必須對值取址來取得指標。
 
-###Arrays
+###陣列
 
-Arrays are useful when planning the detailed layout of memory and sometimes can help avoid allocation, but primarily they are a building block for slices, the subject of the next section. To lay the foundation for that topic, here are a few words about arrays.
+當你計畫著記憶體的詳細布局時，陣列非常有用，有時候可以避免記憶體配置，但主要是用來做slice的建造區塊，這是下一章節的主題。為了這個章節，需要先鋪設一些基礎，這裡有些關於陣列的兩三語。
 
-There are major differences between the ways arrays work in Go and C. In Go,
+下列是Go與C之間陣列運作的差異。在Go中，
 
-- Arrays are values. Assigning one array to another copies all the elements.
-- In particular, if you pass an array to a function, it will receive a copy of the array, not a pointer to it.
-- The size of an array is part of its type. The types [10]int and [20]int are distinct.
+- 陣列就是個值。指定陣列到另一個陣列，將會複製所有的元素內容。
+- 尤其是，如果你在函數參數傳遞到陣列，函數內會使用陣列的副本，而不是指向陣列的指標
+- 尺寸也是一種陣列型別。`[10]int`型別與`[20]int`型別是不同的。
 
-The value property can be useful but also expensive; if you want C-like behavior and efficiency, you can pass a pointer to the array.
+值的性質可以非常有用，但也很昂貴；如果你想要像C同樣的行為及效率，你可以傳遞陣列的指標。
 
     func Sum(a *[3]float64) (sum float64) {
         for _, v := range *a {
@@ -714,29 +714,29 @@ The value property can be useful but also expensive; if you want C-like behavior
         return
     }
 
-array := [...]float64{7.0, 8.5, 9.1}
-x := Sum(&array)  // Note the explicit address-of operator
+    array := [...]float64{7.0, 8.5, 9.1}
+    x := Sum(&array)  // 注意，這裡明確地使用取址運算子
 
-But even this style isn't idiomatic Go. Use slices instead.
+但是，這種方式不是Go的慣用風格。請改用slice。
 
-###Slices
+###Slice
 
-Slices wrap arrays to give a more general, powerful, and convenient interface to sequences of data. Except for items with explicit dimension such as transformation matrices, most array programming in Go is done with slices rather than simple arrays.
+Slice包裝陣列，給予了連續資料更廣泛、強大且方便的界面，除了項目有明確的維度，如矩陣轉置之外，Go裡面大多的陣列程式設計都是用slice來完成，而非一般的陣列。
 
-Slices hold references to an underlying array, and if you assign one slice to another, both refer to the same array. If a function takes a slice argument, changes it makes to the elements of the slice will be visible to the caller, analogous to passing a pointer to the underlying array. A Read function can therefore accept a slice argument rather than a pointer and a count; the length within the slice sets an upper limit of how much data to read. Here is the signature of the Read method of the File type in package os:
+Slice持有底層陣列的參考，如果你將slice指定到另一個slice，兩著會參考到相同的陣列。如果某個函式接受slice參數，元素的修改也會反應到呼叫者本身的slice，類似於傳遞指向底層陣列的指標。`Read`函式接受slice參數而不是指標及數量；slice內的長度設定了多少資料可以讀取的上限。下列是`File`型別的`Read`方法的函數簽名，源自`os`包：
 
     func (file *File) Read(buf []byte) (n int, err error)
 
-The method returns the number of bytes read and an error value, if any. To read into the first 32 bytes of a larger buffer b, slice (here used as a verb) the buffer.
+此方法回傳讀取了多少bytes，如果錯誤發生的話，傳回錯誤值。下列示範從一個大的緩衝`b`讀取前32個bytes，進行緩衝切片。
 
         n, err := f.Read(buf[0:32])
 
-Such slicing is common and efficient. In fact, leaving efficiency aside for the moment, the following snippet would also read the first 32 bytes of the buffer.
+這類的切片常見且有效率。實際上，先不管效率，下列片段碼也會讀取緩衝的前32個bytes。
 
     var n int
     var err error
     for i := 0; i < 32; i++ {
-        nbytes, e := f.Read(buf[i:i+1])  // Read one byte.
+        nbytes, e := f.Read(buf[i:i+1])  // 讀取1個byte.
         if nbytes == 0 || e != nil {
             err = e
             break
@@ -744,14 +744,14 @@ Such slicing is common and efficient. In fact, leaving efficiency aside for the 
         n += nbytes
     }
 
-The length of a slice may be changed as long as it still fits within the limits of the underlying array; just assign it to a slice of itself. The capacity of a slice, accessible by the built-in function cap, reports the maximum length the slice may assume. Here is a function to append data to a slice. If the data exceeds the capacity, the slice is reallocated. The resulting slice is returned. The function uses the fact that len and cap are legal when applied to the nil slice, and return 0.
+slice的長度可以不斷的改變，只要符合底層陣列的上限；重複指派slice本身。slice的*容量*可以透過內建函式`cap`來存取，回報slice的最大長度。這裡有個函式用來附加資料到slice。如果超過容量，slice將會重新配置。新的slice會被傳回。這個函式可以用在`nil`的slice並且傳回0。
 
     func Append(slice, data[]byte) []byte {
         l := len(slice)
-        if l + len(data) > cap(slice) {  // reallocate
-            // Allocate double what's needed, for future growth.
+        if l + len(data) > cap(slice) {  // 重新配置
+            // 為了將來成長，配置我們所需量的2倍
             newSlice := make([]byte, (l+len(data))*2)
-            // The copy function is predeclared and works for any slice type.
+            // copy函式是預先宣告好的，並且可以用在任何slice型別
             copy(newSlice, slice)
             slice = newSlice
         }
@@ -762,18 +762,19 @@ The length of a slice may be changed as long as it still fits within the limits 
         return slice
     }
 
-We must return the slice afterwards because, although Append can modify the elements of slice, the slice itself (the run-time data structure holding the pointer, length, and capacity) is passed by value.
+我們最終必須回傳slice，因為，儘管Append可以修改slice內的元素，但是slice(執行時期的資料結構，持有著指標、長度及容量)是透過傳值方式傳入。  
+(譯註：Append函式是以傳值方式傳遞slice，而非傳址，修改的結果需要反應到呼叫者)
 
-The idea of appending to a slice is so useful it's captured by the append built-in function. To understand that function's design, though, we need a little more information, so we'll return to it later.
+附加在slice的這個主意非常有幫助，獲得內建append函式的青睞。為了進一步了解函式的設計、想法，我們需要一些些額外資訊，所以稍候再回來。
 
-###Two-dimensional slices
+###二維slice
 
-Go's arrays and slices are one-dimensional. To create the equivalent of a 2D array or slice, it is necessary to define an array-of-arrays or slice-of-slices, like this:
+Go的陣列及slice都是一維的。若要產生二維的陣列或slice，需要定義一個陣列的陣列或slice的slice，像是：
 
-    type Transform [3][3]float64  // A 3x3 array, really an array of arrays.
-    type LinesOfText [][]byte     // A slice of byte slices.
+    type Transform [3][3]float64  // 3x3陣列，真正的陣列的陣列。
+    type LinesOfText [][]byte     // 一個slice中每個元素都是byte slice。
 
-Because slices are variable-length, it is possible to have each inner slice be a different length. That can be a common situation, as in our LinesOfText example: each line has an independent length.
+因為slice是動態長度，所以每個內部的slice都可能是不同長度。這個狀況很常見，如同我們上述的`LinesOfText`：每行都有各自的文字長度。
 
     text := LinesOfText{
         []byte("Now is the time"),
@@ -781,31 +782,31 @@ Because slices are variable-length, it is possible to have each inner slice be a
         []byte("to bring some fun to the party."),
     }
 
-Sometimes it's necessary to allocate a 2D slice, a situation that can arise when processing scan lines of pixels, for instance. There are two ways to achieve this. One is to allocate each slice independently; the other is to allocate a single array and point the individual slices into it. Which to use depends on your application. If the slices might grow or shrink, they should be allocated independently to avoid overwriting the next line; if not, it can be more efficient to construct the object with a single allocation. For reference, here are sketches of the two methods. First, a line a time:
+有些時候有必須配置二維slice，例如，這種狀況會發生在，當你要掃描處理每行像素的時候。兩個可以達到需求的方式。一是獨立地的為每個slice配置；另一個是配置一個一維陣列，並將各個slice的指標存入該陣列元素中。至於要使用哪種方式，取決於你的應用程式。如果slice會成長或收縮，那就應該用獨立地的配置來避免覆寫到下一行的內容；如果不是，那建立一個物件只有單一配置會來得有效率一點。以下兩個方法的草圖供您參考。首先，一次一行：
 
-    // Allocate the top-level slice.
-    picture := make([][]uint8, YSize) // One row per unit of y.
-    // Loop over the rows, allocating the slice for each row.
+    // 配置最上層slice。
+    picture := make([][]uint8, YSize) // 每一行都有y個單位。
+    // 循環每一行，配置個別slice。
     for i := range picture {
         picture[i] = make([]uint8, XSize)
     }
 
-And now as one allocation, sliced into lines:
+另一種，一個配置，根據每行進行切片：
 
-    // Allocate the top-level slice, the same as before.
-    picture := make([][]uint8, YSize) // One row per unit of y.
-    // Allocate one large slice to hold all the pixels.
-    pixels := make([]uint8, XSize*YSize) // Has type []uint8 even though picture is [][]uint8.
-    // Loop over the rows, slicing each row from the front of the remaining pixels slice.
+    // 配置最上層slice，相同於上個範例。
+    picture := make([][]uint8, YSize) // 每一行都有y個單位。
+    // 配置一個大的slice，持有所有像素。
+    pixels := make([]uint8, XSize*YSize) // 這裡用[]uint8型別，儘管picture的是[][]uint8型別。
+    // 循環每一行，從剩下的pixels開頭切出每一行的長度的切片
     for i := range picture {
         picture[i], pixels = pixels[:XSize], pixels[XSize:]
     }
 
-###Maps
+###Map
 
-Maps are a convenient and powerful built-in data structure that associate values of one type (the key) with values of another type (the element or value) The key can be of any type for which the equality operator is defined, such as integers, floating point and complex numbers, strings, pointers, interfaces (as long as the dynamic type supports equality), structs and arrays. Slices cannot be used as map keys, because equality is not defined on them. Like slices, maps hold references to an underlying data structure. If you pass a map to a function that changes the contents of the map, the changes will be visible in the caller.
+Map是種方便且強大的內建資料結構，每個型別的值(鍵)聯繫對應著另一個型別的值(元素或值)組成一對。鍵可以是任何已經定義等號操作子的型別，例如整數、浮點數、複數、字串、指標、界面(只要動態型別支援等號)、結構及陣列。slice型別並不能成為Map的鍵，因為它沒有定義等號。如同slice，map持有底層資料結構的參考。如果你傳遞map到函式之中，函式內對map的內容的修改，也會反應到呼叫者。
 
-Maps can be constructed using the usual composite literal syntax with colon-separated key-value pairs, so it's easy to build them during initialization.
+Map通常使用字面合成的語法來建構，語法是一種冒號分隔的鍵與值成對組合，所以在初始化時很容易建造它們。
 
     var timeZone = map[string]int{
         "UTC":  0*60*60,
@@ -815,11 +816,11 @@ Maps can be constructed using the usual composite literal syntax with colon-sepa
         "PST": -8*60*60,
     }
 
-Assigning and fetching map values looks syntactically just like doing the same for arrays and slices except that the index doesn't need to be an integer.
+指派或取得map值看似語意的，只要用類似陣列或slice方式來存取，只是索引值並不一定是整數。
 
     offset := timeZone["EST"]
 
-An attempt to fetch a map value with a key that is not present in the map will return the zero value for the type of the entries in the map. For instance, if the map contains integers, looking up a non-existent key will return 0. A set can be implemented as a map with value type bool. Set the map entry to true to put the value in the set, and then test it by simple indexing.
+嘗試取得不存在的鍵時，map會傳回該鍵型別的空值。例如，如果map包含了整數，查找一個不存在的鍵，將會傳回`0`。集合可以用map來實作，其值的型別為布林值。設定map條目成`true`來放入某個值到集合內，接著透過簡單的索引來測試它。
 
     attended := map[string]bool{
         "Ann": true,
@@ -827,17 +828,17 @@ An attempt to fetch a map value with a key that is not present in the map will r
         ...
     }
 
-    if attended[person] { // will be false if person is not in the map
+    if attended[person] { // 如果person不存在於map之中，將會傳回false
         fmt.Println(person, "was at the meeting")
     }
 
-Sometimes you need to distinguish a missing entry from a zero value. Is there an entry for "UTC" or is that the empty string because it's not in the map at all? You can discriminate with a form of multiple assignment.
+有時你需要分辨「條目是否存在」與「條目儲存的值是否為零」之間的不同。以下例來說，map裡`"UTC"`這個條目值本來就是零？或其實根本不存在`"UTC"`這個條目？我們可以用多重指派形式來區別這兩種情況。
 
     var seconds int
     var ok bool
     seconds, ok = timeZone[tz]
 
-For obvious reasons this is called the “comma ok” idiom. In this example, if tz is present, seconds will be set appropriately and ok will be true; if not, seconds will be set to zero and ok will be false. Here's a function that puts it together with a nice error report:
+很明顯地，這個用法的習慣用語叫做“comma ok”。在這個範例中，如果`tz`存在，`seconds`將會適當地的設定，而`ok`將會是`true`；如果不存在，`sconeds`將會被設定為空值，而`ok`將會是`false`。下列這個函式將它們放在一起，帶有良好的錯誤報告：
 
     func offset(tz string) int {
         if seconds, ok := timeZone[tz]; ok {
@@ -847,45 +848,45 @@ For obvious reasons this is called the “comma ok” idiom. In this example, if
         return 0
     }
 
-To test for presence in the map without worrying about the actual value, you can use the blank identifier (_) in place of the usual variable for the value.
+只想測試是否存在於map中，實際的值並不關心時，你可以用[空白識別符號](#blank) (`_`) 來取代本來要用來存放值的變數。
 
     _, present := timeZone[tz]
 
-To delete a map entry, use the delete built-in function, whose arguments are the map and the key to be deleted. It's safe to do this even if the key is already absent from the map.
+若要刪除map條目，使用內建函式`delete`，參數為map實例及要刪除的鍵。這是個安全的作法，甚至鍵已經不存在map內。
 
-    delete(timeZone, "PDT")  // Now on Standard Time
+    delete(timeZone, "PDT")  // 現在是標準時間
 
-###Printing
+###印出
 
-Formatted printing in Go uses a style similar to C's printf family but is richer and more general. The functions live in the fmt package and have capitalized names: fmt.Printf, fmt.Fprintf, fmt.Sprintf and so on. The string functions (Sprintf etc.) return a string rather than filling in a provided buffer.
+Go的格式化輸出是使用一種相似於C的`printf`家族風格，但更加地豐富且廣泛。函式存放在`fmt`包，並且為字母大寫：`fmt.Printf`、`fmt.Fprintf`、`fmt.Sprintf`等。字串函式(`Sprinf`等)傳回一個字串，而不是填放在所提供的緩衝中。
 
-You don't need to provide a format string. For each of Printf, Fprintf and Sprintf there is another pair of functions, for instance Print and Println. These functions do not take a format string but instead generate a default format for each argument. The Println versions also insert a blank between arguments and append a newline to the output while the Print versions add blanks only if the operand on neither side is a string. In this example each line produces the same output.
+你可以不需要提供格式字串。每個`Printf`、`Fprintf`及`Sprintf`都有另一對函式存在，例如`Print`及`Println`。這些函式不需要格式字串，而是用預設格式來產生。`Print`版本會在每個字串型別參數之間，加上空白，`Println`的版本會插入空行。下列範例每一行都會產生相同的結果。
 
     fmt.Printf("Hello %d\n", 23)
     fmt.Fprint(os.Stdout, "Hello ", 23, "\n")
     fmt.Println("Hello", 23)
     fmt.Println(fmt.Sprint("Hello ", 23))
 
-The formatted print functions fmt.Fprint and friends take as a first argument any object that implements the io.Writer interface; the variables os.Stdout and os.Stderr are familiar instances.
+格式化印出函式`fmt.Fprint`及相關函式，接受第一個參數可以是任何實作`io.Writer`界面的物件；變數`os.Stdout`及`os.Stderr`都是我們所熟悉的實例。
 
-Here things start to diverge from C. First, the numeric formats such as %d do not take flags for signedness or size; instead, the printing routines use the type of the argument to decide these properties.
+這裡是與C分叉的開始。首先，數字的格式如`%d`並不接受有號無號數或者尺寸的旗標；取而代之的是，利用參數型別來決定該性質。
 
     var x uint64 = 1<<64 - 1
     fmt.Printf("%d %x; %d %x\n", x, x, int64(x), int64(x))
 
-prints
+印出
 
     18446744073709551615 ffffffffffffffff; -1 -1
 
-If you just want the default conversion, such as decimal for integers, you can use the catchall format %v (for “value”); the result is exactly what Print and Println would produce. Moreover, that format can print any value, even arrays, slices, structs, and maps. Here is a print statement for the time zone map defined in the previous section.
+如果你只是想要預設轉換，例如十進位顯示整數，你可以用包羅萬象的格式`%v`(v表示value)；結果會跟`Print`與`Println`一模一樣。此外，這個格式可以印出任何值，甚至是陣列、slice、結構及map。下列範例印出前個章節定義的時間區間的map。
 
-fmt.Printf("%v\n", timeZone)  // or just fmt.Println(timeZone)
+    fmt.Printf("%v\n", timeZone)  // 或者用 fmt.Println(timeZone)
 
-which gives output
+得到結果
 
     map[CST:-21600 PST:-28800 EST:-18000 UTC:0 MST:-25200]
 
-For maps the keys may be output in any order, of course. When printing a struct, the modified format %+v annotates the fields of the structure with their names, and for any value the alternate format %#v prints the value in full Go syntax.
+當然，map內的鍵會以任何順序呈現。當印出一個結構時，修改版的格式`%+v`會在結果中評註字段名，其他任何的值，也可以用替代格式`%#v`印出以顯示完整的值，並以Go語句呈現。
 
     type T struct {
         a int
@@ -898,72 +899,72 @@ For maps the keys may be output in any order, of course. When printing a struct,
     fmt.Printf("%#v\n", t)
     fmt.Printf("%#v\n", timeZone)
 
-prints
+印出
 
     &{7 -2.35 abc   def}
     &{a:7 b:-2.35 c:abc     def}
     &main.T{a:7, b:-2.35, c:"abc\tdef"}
     map[string] int{"CST":-21600, "PST":-28800, "EST":-18000, "UTC":0, "MST":-25200}
 
-(Note the ampersands.) That quoted string format is also available through %q when applied to a value of type string or []byte. The alternate format %#q will use backquotes instead if possible. (The %q format also applies to integers and runes, producing a single-quoted rune constant.) Also, %x works on strings, byte arrays and byte slices as well as on integers, generating a long hexadecimal string, and with a space in the format (% x) it puts spaces between the bytes.
+(注意&符號。) 當應用在字串型別或`[]byte`型別的值時，也可以透過`%q`來印出雙引號字串格式。替代格式`%#q`將會使用倒引號取代。(`%q`格式也適用於整數及`rune`型別，產生出一個單引號包住的`rune`常數。) 並且，`%x`可以用在字串、byte陣列、byte slice及整數，產生出一個十六進位表示的長字串, 若帶有空白在格式中 (`% x`)，它將會在每個bytes之間加上空白。
 
-Another handy format is %T, which prints the type of a value.
+另一個便利的格式為`%T`，印出值的型別。
 
     fmt.Printf("%T\n", timeZone)
 
-prints
+印出
 
     map[string] int
 
-If you want to control the default format for a custom type, all that's required is to define a method with the signature String() string on the type. For our simple type T, that might look like this.
+如果你想要控制自訂型別的預設格式，只需要定義一個`String() string`簽名的函式於該型別中。舉例一個簡單`T`型別，看起來如下。
 
     func (t *T) String() string {
         return fmt.Sprintf("%d/%g/%q", t.a, t.b, t.c)
     }
     fmt.Printf("%v\n", t)
 
-to print in the format
+印出該格式
 
     7/-2.35/"abc\tdef"
 
-(If you need to print values of type T as well as pointers to T, the receiver for String must be of value type; this example used a pointer because that's more efficient and idiomatic for struct types. See the section below on pointers vs. value receivers for more information.)
+(如果你需要印出`T`型別的值，以及`T`型別的指標，`String`方法的接收者必須是該型別值；上列範例使用指標是因為這樣比較有效率，也是結構型別的慣用方法。詳細請見下方 pointers vs. value receivers 章節)
 
-Our String method is able to call Sprintf because the print routines are fully reentrant and can be wrapped this way. There is one important detail to understand about this approach, however: don't construct a String method by calling Sprintf in a way that will recur into your String method indefinitely. This can happen if the Sprintf call attempts to print the receiver directly as a string, which in turn will invoke the method again. It's a common and easy mistake to make, as this example shows.
+我們的`String`方法允許呼叫`Sprintf`，因為印出程序完全再進入，而且可以這樣包裝。另外關於這個方法有個重要的細節需要了解，無論如何：不要在`String`方法內呼叫`Sprintf`，它會不確定地重新進到你的`String`方法。這將會發生在當呼叫`Sprintf`時，直接將接收者當作字串直接印出，這樣一來會再一次調用方法。這是個常見且容易犯的錯誤，如下範例所示。
 
     type MyString string
 
     func (m MyString) String() string {
-        return fmt.Sprintf("MyString=%s", m) // Error: will recur forever.
+        return fmt.Sprintf("MyString=%s", m) // 錯誤：將會永遠重新復發。
     }
 
-It's also easy to fix: convert the argument to the basic string type, which does not have the method.
+這問題很容易解決：轉換參數成基本的字串型別，基本的字串型別沒有`String`方法。
 
     type MyString string
     func (m MyString) String() string {
-        return fmt.Sprintf("MyString=%s", string(m)) // OK: note conversion.
+        return fmt.Sprintf("MyString=%s", string(m)) // OK: 注意轉換。
     }
 
-In the initialization section we'll see another technique that avoids this recursion.
+在initialization章節我們將會看到其他技巧來避免這樣的遞迴。
 
-Another printing technique is to pass a print routine's arguments directly to another such routine. The signature of Printf uses the type ...interface{} for its final argument to specify that an arbitrary number of parameters (of arbitrary type) can appear after the format.
+另一種印出技巧是傳遞某個印出程序直地給另一個程序。`Printf`的簽名使用`...interface{}`型別作為其最終參數，指定了任意長度的參數(任意型別)，可以在顯示格式之後。
 
     func Printf(format string, v ...interface{}) (n int, err error) {
 
-Within the function Printf, v acts like a variable of type []interface{} but if it is passed to another variadic function, it acts like a regular list of arguments. Here is the implementation of the function log.Println we used above. It passes its arguments directly to fmt.Sprintln for the actual formatting.
+在`Printf`函式之中，`v`產生一個參數，其型別為`[]interface{}`，但如果它傳遞到另一個接受任意長度參數的函式，那它就會產生像個一般常規的參數清單。下列範例是我們稍早用到的 `log.Println`函式實作。它將它自己的參數直接傳遞到`fmt.Sprintln`以達到實際的字串格式化。
 
-    // Println prints to the standard logger in the manner of fmt.Println.
+    // Println 當下使用 fmt.Println 將結果印出到標準紀錄者。
     func Println(v ...interface{}) {
-        std.Output(2, fmt.Sprintln(v...))  // Output takes parameters (int, string)
+        std.Output(2, fmt.Sprintln(v...))  // 用參數做輸出 (int, string)
     }
 
-We write ... after v in the nested call to Sprintln to tell the compiler to treat v as a list of arguments; otherwise it would just pass v as a single slice argument.
+我們在呼叫`Sprintln`的參數`v`後面加上`...`，告訴編譯器將`v`視為一種參數清單；否則它將會將`v`當作一個slice參數傳遞。
 
-There's even more to printing than we've covered here. See the godoc documentation for package fmt for the details.
+還有更多我們這裡沒有涵蓋到的印出方式。請見`fmt`包在godoc文件中的詳細說明。
 
-By the way, a ... parameter can be of a specific type, for instance ...int for a min function that chooses the least of a list of integers:
+順便提及，`...`參數可以是特定型別，例如，`min`函式的`...int`將會選出整數清單內最小的值：
 
     func Min(a ...int) int {
-        min := int(^uint(0) >> 1)  // largest int
+        min := int(^uint(0) >> 1)  // 最大整數
         for _, i := range a {
             if i < min {
                 min = i
@@ -972,30 +973,30 @@ By the way, a ... parameter can be of a specific type, for instance ...int for a
         return min
     }
 
-###Append
+###附加
 
-Now we have the missing piece we needed to explain the design of the append built-in function. The signature of append is different from our custom Append function above. Schematically, it's like this:
+現在，我們有個遺失的片段，就是需要解釋內建`append`函式的設計。`append`函式簽名跟我們上述的`Append`函式不同。概要地，它看起來是：
 
     func append(slice []T, elements ...T) []T
 
-where T is a placeholder for any given type. You can't actually write a function in Go where the type T is determined by the caller. That's why append is built in: it needs support from the compiler.
+其中`T`是一個佔位符，用來表示任何型別。你實際上無法在Go中寫出一個函式，其`T`型別是由呼叫者來決定。這就是為何它是內建的：它必須由編譯器來支援。
 
-What append does is append the elements to the end of the slice and return the result. The result needs to be returned because, as with our hand-written Append, the underlying array may change. This simple example
+`append`就是將資料附加到slice最後並傳回結果。結果必須回傳，因為如同我們自己手寫的`Append`，底層陣列可能會改變。這是個簡單範例
 
     x := []int{1,2,3}
     x = append(x, 4, 5, 6)
     fmt.Println(x)
 
-prints [1 2 3 4 5 6]. So append works a little like Printf, collecting an arbitrary number of arguments.
+印出`[1 2 3 4 5 6]`。所以`append`運作有點像`Printf`，收集任意長度的參數。
 
-But what if we wanted to do what our Append does and append a slice to a slice? Easy: use ... at the call site, just as we did in the call to Output above. This snippet produces identical output to the one above.
+但是，如果我們想要像`Append`做的事情一樣，附加一個slice到slice之中呢？簡單：在呼叫端使用`...`，如同我們在上述的輸出所做一樣。下列片段碼產生跟上一個例子一樣的結果。
 
     x := []int{1,2,3}
     y := []int{4,5,6}
     x = append(x, y...)
     fmt.Println(x)
 
-Without that ..., it wouldn't compile because the types would be wrong; y is not of type int.
+如果沒有`...`，將無法通過編譯，因為型別會錯；`y`不是`int`型別。
 
 ##Initialization
 
