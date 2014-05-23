@@ -30,10 +30,10 @@
     - [Map](#maps)
     - [印出](#printing)
     - [附加](#append)
-- [Initialization](#initialization)
-    - [Constants](#constants)
-    - [Variables](#variables)
-    - [The init function](#the-init-function)
+- [初始化](#initialization)
+    - [常數](#constants)
+    - [變數](#variables)
+    - [`init`函式](#the-init-function)
 - [Methods](#methods)
     - [Pointers vs. Values](#pointers-vs-values)
 - [Interfaces and other types](#interfaces-and-other-types)
@@ -612,8 +612,8 @@ prints
 
 For programmers accustomed to block-level resource management from other languages, defer may seem peculiar, but its most interesting and powerful applications come precisely from the fact that it's not block-based but function-based. In the section on panic and recover we'll see another example of its possibilities.
 
-##資料
-###`new`配置
+##<a name="data"></a>資料
+###<a name="allocation-with-new"></a>`new`配置
 
 Go有兩種原生配置方法，分別為內建函示`new`及`make`。這兩個方法有差異且適用於不同的型別，這容易讓人混淆，但其實規則很簡單。先說有關`new`。它是一種內建函示，用來配置記憶體。它不像其他語言中的`new`會*初始化*記憶體，它只會給予*空*值。意思是說，`new(T)`會爲`T`型別的新項目分配空的儲存空間，並且傳回其位址，配置出來的是一種`*T`值。在Go術語裡，它傳回的是一個指標，指向一個新分配的`T`型別空值。
 
@@ -631,7 +631,7 @@ Go有兩種原生配置方法，分別為內建函示`new`及`make`。這兩個�
     p := new(SyncedBuffer)  // *SyncedBuffer指標型別
     var v SyncedBuffer      //  SyncedBuffer型別
 
-###建構子及字面合成
+###<a name="constructors-and-composite-literals"></a>建構子及字面合成
 
 有時候只是空值還不夠，初始建構子是必要的，如下範例，源自於`os`包。
 
@@ -673,7 +673,7 @@ Go有兩種原生配置方法，分別為內建函示`new`及`make`。這兩個�
     s := []string      {Enone: "no error", Eio: "Eio", Einval: "invalid argument"}
     m := map[int]string{Enone: "no error", Eio: "Eio", Einval: "invalid argument"}
 
-###`make`配置
+###<a name="allocation-with-make"></a>`make`配置
 
 回到配置記憶體。內建函式`make(T, args)`提供一種與`new(T)`不同的意圖。它只能用來產生slice、map及channel，而且它傳回`T`型別(非`*T`型別)的值(非空值)。這個區別的意義在於，這三個型別呈現的、底層的資料結構必須在使用之前初始化完畢。舉例來說，slice是擁有三個項目描述子，包括指向資料(陣列)的指標，長度及容量，直到這些項目初始化完畢前，slice將會是個`nil`。對於slice、map及channel而言，`make`初始了內部資料結構，並準備可用的值。例如，
 
@@ -695,7 +695,7 @@ Go有兩種原生配置方法，分別為內建函示`new`及`make`。這兩個�
 
 記住`make`只適用在map、slice及channel，且不會傳回指標。`new`配置明確地取得指標，若要取得對`make`的值的指標，必須對值取址來取得指標。
 
-###陣列
+###<a name="arrays"></a>陣列
 
 當你計畫著記憶體的詳細布局時，陣列非常有用，有時候可以避免記憶體配置，但主要是用來做slice的建造區塊，這是下一章節的主題。為了這個章節，需要先鋪設一些基礎，這裡有些關於陣列的兩三語。
 
@@ -719,7 +719,7 @@ Go有兩種原生配置方法，分別為內建函示`new`及`make`。這兩個�
 
 但是，這種方式不是Go的慣用風格。請改用slice。
 
-###Slice
+###<a name="slices"></a>Slice
 
 Slice包裝陣列，給予了連續資料更廣泛、強大且方便的界面，除了項目有明確的維度，如矩陣轉置之外，Go裡面大多的陣列程式設計都是用slice來完成，而非一般的陣列。
 
@@ -767,7 +767,7 @@ slice的長度可以不斷的改變，只要符合底層陣列的上限；重複
 
 附加在slice的這個主意非常有幫助，獲得內建append函式的青睞。為了進一步了解函式的設計、想法，我們需要一些些額外資訊，所以稍候再回來。
 
-###二維slice
+###<a name="two-dimensional-slices"></a>二維slice
 
 Go的陣列及slice都是一維的。若要產生二維的陣列或slice，需要定義一個陣列的陣列或slice的slice，像是：
 
@@ -802,7 +802,7 @@ Go的陣列及slice都是一維的。若要產生二維的陣列或slice，需�
         picture[i], pixels = pixels[:XSize], pixels[XSize:]
     }
 
-###Map
+###<a name="maps"></a>Map
 
 Map是種方便且強大的內建資料結構，每個型別的值(鍵)聯繫對應著另一個型別的值(元素或值)組成一對。鍵可以是任何已經定義等號操作子的型別，例如整數、浮點數、複數、字串、指標、界面(只要動態型別支援等號)、結構及陣列。slice型別並不能成為Map的鍵，因為它沒有定義等號。如同slice，map持有底層資料結構的參考。如果你傳遞map到函式之中，函式內對map的內容的修改，也會反應到呼叫者。
 
@@ -856,7 +856,7 @@ Map通常使用字面合成的語法來建構，語法是一種冒號分隔的�
 
     delete(timeZone, "PDT")  // 現在是標準時間
 
-###印出
+###<a name="printing"></a>印出
 
 Go的格式化輸出是使用一種相似於C的`printf`家族風格，但更加地豐富且廣泛。函式存放在`fmt`包，並且為字母大寫：`fmt.Printf`、`fmt.Fprintf`、`fmt.Sprintf`等。字串函式(`Sprinf`等)傳回一個字串，而不是填放在所提供的緩衝中。
 
@@ -944,7 +944,7 @@ Go的格式化輸出是使用一種相似於C的`printf`家族風格，但更加
         return fmt.Sprintf("MyString=%s", string(m)) // OK: 注意轉換。
     }
 
-在initialization章節我們將會看到其他技巧來避免這樣的遞迴。
+在「初始化」章節我們將會看到其他技巧來避免這樣的遞迴。
 
 另一種印出技巧是傳遞某個印出程序直地給另一個程序。`Printf`的簽名使用`...interface{}`型別作為其最終參數，指定了任意長度的參數(任意型別)，可以在顯示格式之後。
 
@@ -973,7 +973,7 @@ Go的格式化輸出是使用一種相似於C的`printf`家族風格，但更加
         return min
     }
 
-###附加
+###<a name="append"></a>附加
 
 現在，我們有個遺失的片段，就是需要解釋內建`append`函式的設計。`append`函式簽名跟我們上述的`Append`函式不同。概要地，它看起來是：
 
@@ -998,20 +998,20 @@ Go的格式化輸出是使用一種相似於C的`printf`家族風格，但更加
 
 如果沒有`...`，將無法通過編譯，因為型別會錯；`y`不是`int`型別。
 
-##Initialization
+##<a name="initialization"></a>初始化
 
-Although it doesn't look superficially very different from initialization in C or C++, initialization in Go is more powerful. Complex structures can be built during initialization and the ordering issues among initialized objects, even among different packages, are handled correctly.
+初始化雖然在GO與C或C++之間，看起來沒有特別不一樣，但在Go中是很強大的。初始化可以用來建構複雜的結構，無論是初始化物件時的排序問題，或者是跨不同的包，都可以正確的處理。
 
-###Constants
+###<a name="constants"></a>常數
 
- Constants in Go are just that—constant. They are created at compile time, even when defined as locals in functions, and can only be numbers, characters (runes), strings or booleans. Because of the compile-time restriction, the expressions that define them must be constant expressions, evaluatable by the compiler. For instance, 1<<3 is a constant expression, while math.Sin(math.Pi/4) is not because the function call to math.Sin needs to happen at run time.
+常數在Go中就只是個常數。在編譯期間被建立，甚至是定義成函式內的區域變數，常數只能是數字、字元(rune)、字串或布林值。因為編譯期間的限制，常數的定義必須是常數表達式，經由編譯器估值。舉例來說，`1<<3`是個常數表達式，而`math.Sin(math.Pi/4)`不是，因為函式必須在執行時期才能進行呼叫。
 
-In Go, enumerated constants are created using the iota enumerator. Since iota can be part of an expression and expressions can be implicitly repeated, it is easy to build intricate sets of values.
+在Go中，列舉型常數是使用`iota`列舉器來建立。`itoa`可以是一部份的表達式，也可以用來隱含表示反複意味，它可以很容易的建構出一組複雜的數值。
 
     type ByteSize float64
 
     const (
-        _           = iota // ignore first value by assigning to blank identifier
+        _           = iota // 利用空白識別符，可以省略這裡的第一個值
         KB ByteSize = 1 << (10 * iota)
         MB
         GB
@@ -1022,7 +1022,7 @@ In Go, enumerated constants are created using the iota enumerator. Since iota ca
         YB
     )
 
-The ability to attach a method such as String to any user-defined type makes it possible for arbitrary values to format themselves automatically for printing. Although you'll see it most often applied to structs, this technique is also useful for scalar types such as floating-point types like ByteSize.
+附加方法到結構中，例如：附加`String`方法到任何一個使用者所自訂的型別，使它能夠根據本身的值來印出結果。雖然在結構上經常看到這樣的應用，但這個技巧對於數值型別也是很有用，例如像是`ByteSize`這樣的浮點數型別。
 
     func (b ByteSize) String() string {
         switch {
@@ -1046,13 +1046,13 @@ The ability to attach a method such as String to any user-defined type makes it 
         return fmt.Sprintf("%.2fB", b)
     }
 
-The expression YB prints as 1.00YB, while ByteSize(1e13) prints as 9.09TB.
+表達式`YB`印出`1.00YB`，而`ByteSize(1e13)`會印出`9.09TB`。
 
-The use here of Sprintf to implement ByteSize's String method is safe (avoids recurring indefinitely) not because of a conversion but because it calls Sprintf with %f, which is not a string format: Sprintf will only call the String method when it wants a string, and %f wants a floating-point value. 
+這裡所使用的`Sprintf`來實作`ByteSize`的`String`方法是安全的(避免遞迴引用)，但不是因為轉換，而是因為它在`Sprintf`內使用`%f`，這個並不是個字串格式：當`Sprintf`要一個字串的時候，才會呼叫`String`方法，而`%f`要的是浮點數值。
 
-###Variables
+###<a name="variables"></a>變數
 
-Variables can be initialized just like constants but the initializer can be a general expression computed at run time.
+變數可以像常數那樣的初始化，不同的是，初始化可以是一般的表達式，在執行時期進行計算。
 
     var (
         home   = os.Getenv("HOME")
@@ -1060,15 +1060,15 @@ Variables can be initialized just like constants but the initializer can be a ge
         gopath = os.Getenv("GOPATH")
     )
 
-###The init function
+###<a name="the-init-function"></a>`init`函式
 
-Finally, each source file can define its own niladic init function to set up whatever state is required. (Actually each file can have multiple init functions.) And finally means finally: init is called after all the variable declarations in the package have evaluated their initializers, and those are evaluated only after all the imported packages have been initialized.
+最終，每個原始檔都可以定義它自己的`init`函式，用來設定必要的初始狀態。(實際上，原始檔中允許多個`init`函式。) 而最終表示最後：`init`會在包中所有變數宣告都已經初始化之後，才會被呼叫，且匯入的包會被最先初始化之後才開始變數的初始化。
 
-Besides initializations that cannot be expressed as declarations, a common use of init functions is to verify or repair correctness of the program state before real execution begins.
+除了初始化不能使用表達式做為宣告之外，一種常見的`init`函式用法是在實際執行開始之前，用來檢驗或修復程式狀態。
 
     func init() {
         if user == "" {
-            log.Fatal("$USER not set")
+            log.Fatal("$USER 沒有設定")
         }
         if home == "" {
             home = "/home/" + user
@@ -1076,8 +1076,8 @@ Besides initializations that cannot be expressed as declarations, a common use o
         if gopath == "" {
             gopath = home + "/go"
         }
-        // gopath may be overridden by --gopath flag on command line.
-        flag.StringVar(&gopath, "gopath", gopath, "override default GOPATH")
+        // gopath 可透過命令列的 --gopath 參數旗標來覆寫這個設定。
+        flag.StringVar(&gopath, "gopath", gopath, "覆寫預設的GOPATH")
     }
 
 ##Methods
