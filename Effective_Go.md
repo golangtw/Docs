@@ -34,14 +34,14 @@
     - [常數](#constants)
     - [變數](#variables)
     - [`init`函式](#the-init-function)
-- [Methods](#methods)
-    - [Pointers vs. Values](#pointers-vs-values)
-- [Interfaces and other types](#interfaces-and-other-types)
-    - [Interfaces](#interfaces)
-    - [Conversions](#conversions)
-    - [Interface conversions and type assertions](#interface-conversions-and-type-assertions)
-    - [Generality](generality)
-    - [Interfaces and methods](#interfaces-and-methods)
+- [方法](#methods)
+    - [指標與值的比較](#pointers-vs-values)
+- [介面及其他型別](#interfaces-and-other-types)
+    - [介面](#interfaces)
+    - [轉換](#conversions)
+    - [介面轉型及型別斷言](#interface-conversions-and-type-assertions)
+    - [通用性](generality)
+    - [介面及方法](#interfaces-and-methods)
 - [The blank identifier](#the-blank-identifier)
     - [The blank identifier in multiple assignment](#the-blank-identifier-in-multiple-assignment)
     - [Unused imports and variables](#unused-imports-and-variables)
@@ -98,15 +98,15 @@ gofmt 將會對齊欄位
 
 這裡還有一些細節需要注意。簡單來講：
 
-縮進   
+縮進
     我們使用 tabs 做為縮進而且讓 gofmt 預設產出它。當真正需要時才使用空白。
 
-行長   
+行長
     Go 沒有行的長度限制。不用擔心超過穿孔卡片。如果覺得某行太長，換行並且使用額外的縮進。
 
-圓括號   
+圓括號
     比起C與Java，Go需要的圓括號更少：控制結構（if, for, switch）在它們的語法中不需要圓括號。同樣的，運算子優先層級可以變得更短更清楚，所以
-```go 
+```go
     x<<8 + y<<16
 ```
 可以明顯表示出間隔所暗示的意義，而不像在其他語言裡一樣隱晦。
@@ -1080,55 +1080,55 @@ Go的格式化輸出是使用一種相似於C的`printf`家族風格，但更加
         flag.StringVar(&gopath, "gopath", gopath, "覆寫預設的GOPATH")
     }
 
-##Methods
-###Pointers vs. Values
+##<a name="methods"></a>方法
+###指標與值的比較
 
-As we saw with ByteSize, methods can be defined for any named type (except a pointer or an interface); the receiver does not have to be a struct.
+如同我們所見的`ByteSize`，任何具名型別都(named type)可以定義方法(除了指標或介面)；接收者並不需要是個結構。
 
-In the discussion of slices above, we wrote an Append function. We can define it as a method on slices instead. To do this, we first declare a named type to which we can bind the method, and then make the receiver for the method a value of that type.
+在前面討論切片的章節中，我們撰寫了一個`Append`函示。我們可以將它定義成一個切片的方法。為了達成目的，首先宣告一個具名型別，讓我們可以綁定這個方法到型別，接著用這個型別的值，作為方法的接收者。
 
     type ByteSlice []byte
 
     func (slice ByteSlice) Append(data []byte) []byte {
-        // Body exactly the same as above
+        // 如同先前的內容
     }
 
-This still requires the method to return the updated slice. We can eliminate that clumsiness by redefining the method to take a pointer to a ByteSlice as its receiver, so the method can overwrite the caller's slice.
+若要取得更新後的切片，需要傳回更新後的結果。我們可以免除掉這難用的設計，重新去定義方法，改用`ByteSlice`的*指標*作為方法的接收者，這樣就可以在方法內直接覆寫呼叫者的切片。
 
     func (p *ByteSlice) Append(data []byte) {
         slice := *p
-        // Body as above, without the return.
+        // 如同先前的內容，但不再需要return.
         *p = slice
     }
 
-In fact, we can do even better. If we modify our function so it looks like a standard Write method, like this,
+事實上，我們可以做的更好。修改函式讓它看起來更像標準的`Write`方法，就像是，
 
     func (p *ByteSlice) Write(data []byte) (n int, err error) {
         slice := *p
-        // Again as above.
+        // 再一次，如同先前的內容
         *p = slice
         return len(data), nil
     }
 
-then the type *ByteSlice satisfies the standard interface io.Writer, which is handy. For instance, we can print into one.
+這樣一來，`*ByteSlice`型別滿足了標準的`io.Writer`介面，這樣很方便。例如，我們可以印出。
 
     var b ByteSlice
     fmt.Fprintf(&b, "This hour has %d days\n", 7)
 
-We pass the address of a ByteSlice because only *ByteSlice satisfies io.Writer. The rule about pointers vs. values for receivers is that value methods can be invoked on pointers and values, but pointer methods can only be invoked on pointers. This is because pointer methods can modify the receiver; invoking them on a copy of the value would cause those modifications to be discarded.
+因為只有`*ByteSlice`滿足了`io.Writer`介面，所以需要傳入`ByteSlice`的位址。指標與值的規則是，值的方法能夠被指標或值接收者所調用，而指標的方法只有指標接收者可以調用。因為指標的方法可以修改接收者；在值的方法內修改接收者只會改到值的副本，最終會被捨棄。
 
-By the way, the idea of using Write on a slice of bytes is central to the implementation of bytes.Buffer.
+順道一說，`bytes.Buffer`實作就是對切片位元組使用`Write`的概念。
 
-##Interfaces and other types
-###Interfaces
+##<a name="interfaces-and-other-types"></a>介面及其他型別
+###<a name="interfaces"></a>介面
 
- Interfaces in Go provide a way to specify the behavior of an object: if something can do this, then it can be used here. We've seen a couple of simple examples already; custom printers can be implemented by a String method while Fprintf can generate output to anything with a Write method. Interfaces with only one or two methods are common in Go code, and are usually given a name derived from the method, such as io.Writer for something that implements Write.
+Go的介面提供一種方式來指定物件的行為：如果某個東西可以做到*這*，那它就可以用在*這*。我們已經看過幾個範例；可以透過實作`String`方法來自訂印出，`Fprintf`透過`Write`方法來產生輸出。在Go的程式碼中，很常見到介面只有一個或兩個方法，通常會藉此衍生其方法的名稱，例如滿足`io.Writer`介面需要實作`Write`方法。
 
-A type can implement multiple interfaces. For instance, a collection can be sorted by the routines in package sort if it implements sort.Interface, which contains Len(), Less(i, j int) bool, and Swap(i, j int), and it could also have a custom formatter. In this contrived example Sequence satisfies both.
+一個型別可以實作多個介面。例如，某一個集合實作了`sort.Interface`介面，就可以用`sort`包的函式進行排序，介面中包含了`Len()`、`Less(i, j int) bool`及`Swap(i, j int)`這三個方法，也可以自訂格式化。下面人為的範例`Sequence`兩者皆滿足。
 
     type Sequence []int
 
-    // Methods required by sort.Interface.
+    // sort.Interface介面必須的方法。
     func (s Sequence) Len() int {
         return len(s)
     }
@@ -1139,7 +1139,7 @@ A type can implement multiple interfaces. For instance, a collection can be sort
         s[i], s[j] = s[j], s[i]
     }
 
-    // Method for printing - sorts the elements before printing.
+    // 印出用的方法 - 印出前排序。
     func (s Sequence) String() string {
         sort.Sort(s)
         str := "["
@@ -1152,38 +1152,38 @@ A type can implement multiple interfaces. For instance, a collection can be sort
         return str + "]"
     }
 
-###Conversions
+###<a name="conversions"></a>轉換
 
-The String method of Sequence is recreating the work that Sprint already does for slices. We can share the effort if we convert the Sequence to a plain []int before calling Sprint.
+`Sequence`的`String`方法重新建立了`Sprint`已經對切片所提供的工作。如果在呼叫`Sprintf`之前，將`Sequence`轉換成`[] int`，我們可以共享成果。
 
     func (s Sequence) String() string {
         sort.Sort(s)
         return fmt.Sprint([]int(s))
     }
 
-This method is another example of the conversion technique for calling Sprintf safely from a String method. Because the two types (Sequence and []int) are the same if we ignore the type name, it's legal to convert between them. The conversion doesn't create a new value, it just temporarily acts as though the existing value has a new type. (There are other legal conversions, such as from integer to floating point, that do create a new value.)
+這也是另一個範例，示範一種轉換技巧，能夠安全的從`String`方法中呼叫`Sprintf`。只要我們忽略掉型別名稱，這兩個型別(`Sequence`及`[] int`)其實是一樣的，兩者之間的轉換是合法的。這樣的轉換不會產生新的值，只是暫時的當作值有新的型別。(也有其他合法的轉換，例如將整數轉換成浮點數，但這會產生新的值。)
 
-It's an idiom in Go programs to convert the type of an expression to access a different set of methods. As an example, we could use the existing type sort.IntSlice to reduce the entire example to this:
+Go的程式有一種慣用方法，用來轉換型別表達式，以便存取另一個不同的方法集。如上述範例，我們可以使用既有的`sort.IntSlice`型別，將範例縮減成：
 
     type Sequence []int
 
-    // Method for printing - sorts the elements before printing
+    // 印出用的方法 - 印出前排序元素。
     func (s Sequence) String() string {
         sort.IntSlice(s).Sort()
         return fmt.Sprint([]int(s))
     }
 
-Now, instead of having Sequence implement multiple interfaces (sorting and printing), we're using the ability of a data item to be converted to multiple types (Sequence, sort.IntSlice and []int), each of which does some part of the job. That's more unusual in practice but can be effective.
+現在，`Sequence`不需要實作多個介面(排序及印出)，我們利用了一種資料項目的能力，轉換多個型別(`Sequence`、`sort.IntSlice`及`[] int`)，各個型別各自完成部分的工作。在實際上比較不常見，但是很有效率。
 
-###Interface conversions and type assertions
+###<a name="interface-conversions-and-type-assertions"></a>介面轉換及型別斷言
 
-Type switches are a form of conversion: they take an interface and, for each case in the switch, in a sense convert it to the type of that case. Here's a simplified version of how the code under fmt.Printf turns a value into a string using a type switch. If it's already a string, we want the actual string value held by the interface, while if it has a String method we want the result of calling the method.
+[型別切換](http://golang.org/doc/effective_go.html#type_switch)(type switch)是一種轉換的形式：接受一個介面，切換每一種`case`，某種意義上的型別轉換。下列是一個`fmt.Printf`的簡單化版本，展示如何利用型別切換來將一個值轉換成字串。如果已經是個字串了，我們希望是介面實際持有的字串值，若該型別本身有`String`方法，則希望取得呼叫該方法之後的結果。
 
     type Stringer interface {
         String() string
     }
 
-    var value interface{} // Value provided by caller.
+    var value interface{} // 由呼叫者提供值。
     switch str := value.(type) {
     case string:
         return str
@@ -1191,28 +1191,28 @@ Type switches are a form of conversion: they take an interface and, for each cas
         return str.String()
     }
 
-The first case finds a concrete value; the second converts the interface into another interface. It's perfectly fine to mix types this way.
+第一個`case`尋找一個具體的值；第二個`case`將原本的介面轉換到另一個介面。這種混和型別的方式完全沒問題。
 
-What if there's only one type we care about? If we know the value holds a string and we just want to extract it? A one-case type switch would do, but so would a type assertion. A type assertion takes an interface value and extracts from it a value of the specified explicit type. The syntax borrows from the clause opening a type switch, but with an explicit type rather than the type keyword:
+但是，如果我們只在意某一種型別呢？如果我們知道這個值持有的是一個`string`，希望取出這個字串呢？可以用只有一個`case`的型別切換，但需要一個*型別斷言*(type assertion)。型別斷言接受一種介面的值，取出值變成一種指定的明確型別。借用來自型別切換的語法，改用型別來取代`type`關鍵字：
 
     value.(typeName)
 
-and the result is a new value with the static type typeName. That type must either be the concrete type held by the interface, or a second interface type that the value can be converted to. To extract the string we know is in the value, we could write:
+其結果是一個新的值，型別是個靜態型別`typeName`。這個型別必須是介面所持有的具體型別，或者是新的值能夠轉換的第二介面型別。我們知道這個值是我們要的字串，我們可以寫成：
 
     str := value.(string)
 
-But if it turns out that the value does not contain a string, the program will crash with a run-time error. To guard against that, use the "comma, ok" idiom to test, safely, whether the value is a string:
+但如果這個值沒有包含字串，則會發生執行時期錯誤，導致程式崩潰。為了保護程式，使用慣用的"comma, ok"進行測試，安全地判斷這個值是否是個字串：
 
     str, ok := value.(string)
     if ok {
-        fmt.Printf("string value is: %q\n", str)
+        fmt.Printf("字串為: %q\n", str)
     } else {
-        fmt.Printf("value is not a string\n")
+        fmt.Printf("這個值不是字串\n")
     }
 
-If the type assertion fails, str will still exist and be of type string, but it will have the zero value, an empty string.
+如果型別斷言失敗，`str`將會仍然存在並成為字串型別，但只會是個空值(zero value)，空字串(empty string)。
 
-As an illustration of the capability, here's an if-else statement that's equivalent to the type switch that opened this section.
+如上述所描述的能力，下列是一個`if-else`敘述，相等於本章節開頭的型別切換。
 
     if str, ok := value.(string); ok {
         return str
@@ -1220,15 +1220,15 @@ As an illustration of the capability, here's an if-else statement that's equival
         return str.String()
     }
 
-###Generality
+###通用性
 
-If a type exists only to implement an interface and has no exported methods beyond that interface, there is no need to export the type itself. Exporting just the interface makes it clear that it's the behavior that matters, not the implementation, and that other implementations with different properties can mirror the behavior of the original type. It also avoids the need to repeat the documentation on every instance of a common method.
+如果某個型別的存在是為了實作某個介面，而該介面沒有輸出任何方法，那就不需要輸出型別。輸出只是清楚介面的行為，而不是實作，其他不同性質的實作可以映像原始型別的行為。這也能夠避免對每個通用方法的實例重複產出文件。
 
-In such cases, the constructor should return an interface value rather than the implementing type. As an example, in the hash libraries both crc32.NewIEEE and adler32.New return the interface type hash.Hash32. Substituting the CRC-32 algorithm for Adler-32 in a Go program requires only changing the constructor call; the rest of the code is unaffected by the change of algorithm.
+這種情況下，建構子應該回傳一個介面值，而不是實作的型別。舉例來說，hash函式庫中，`crc32.NewIEEE`及`adler32.New`回傳了`hash.Hash32`介面。Go程式內取代Alder-32的CRC-32演算法只需要更改建構子呼叫；並不會影響剩下的程式碼。
 
-A similar approach allows the streaming cipher algorithms in the various crypto packages to be separated from the block ciphers they chain together. The Block interface in the crypto/cipher package specifies the behavior of a block cipher, which provides encryption of a single block of data. Then, by analogy with the bufio package, cipher packages that implement this interface can be used to construct streaming ciphers, represented by the Stream interface, without knowing the details of the block encryption.
+相似的方法允許`crypto`包內各種串流加密演算法，分割串接一起的加密區塊。`crypto/cipher`包內的`Block`介面指明了加密區塊的行為，提供單一區塊的資料加密。接著，同樣在`bufio`包內，加密包實作了`Stream`介面，可以用來建構加密串流，而不需要知道加密區塊的細節。
 
-The crypto/cipher interfaces look like this:
+`crypto/cipher`介面看起來像是：
 
     type Block interface {
         BlockSize() int
@@ -1240,46 +1240,46 @@ The crypto/cipher interfaces look like this:
         XORKeyStream(dst, src []byte)
     }
 
-Here's the definition of the counter mode (CTR) stream, which turns a block cipher into a streaming cipher; notice that the block cipher's details are abstracted away:
+下面是計數模式(CTR)串流的定義，將一個區塊加密轉變成一個串流加密；注意區塊加密的細節已經抽象化：
 
-    // NewCTR returns a Stream that encrypts/decrypts using the given Block in
-    // counter mode. The length of iv must be the same as the Block's block size.
+    // NewCTR 回傳一個串流，計數模式下，使用給定的區塊進行加/解密。
+    // iv的長度必須與block尺寸相同。
     func NewCTR(block Block, iv []byte) Stream
 
-NewCTR applies not just to one specific encryption algorithm and data source but to any implementation of the Block interface and any Stream. Because they return interface values, replacing CTR encryption with other encryption modes is a localized change. The constructor calls must be edited, but because the surrounding code must treat the result only as a Stream, it won't notice the difference.
+`NewCTR`不只適用在某一個特定的解密演算法及來源資料，而是任何`Block`介面及`Stream`的實作都適用。因為回傳了介面值，使用其他加密模式來替換CTR只是個局部修改。建構子必須編輯，但因為周遭的程式碼只視結果為`Stream`，所以並不會發現其差異。
 
-###Interfaces and methods
+###<a name="interfaces-and-methods"></a>介面及方法
 
-Since almost anything can have methods attached, almost anything can satisfy an interface. One illustrative example is in the http package, which defines the Handler interface. Any object that implements Handler can serve HTTP requests.
+幾乎所有東西都可以附加方法，而幾乎所有東西可以滿足一個介面。在`http`包內，`Handler`介面是一個說明性的範例。任何物件只要實作了`Handler`介面，就可以服務HTTP請求。
 
     type Handler interface {
         ServeHTTP(ResponseWriter, *Request)
     }
 
-ResponseWriter is itself an interface that provides access to the methods needed to return the response to the client. Those methods include the standard Write method, so an http.ResponseWriter can be used wherever an io.Writer can be used. Request is a struct containing a parsed representation of the request from the client.
+`ResponseWriter`是個介面，提供相關所需要的方法以回應客戶端。這些方法中包含標準的`Write`方法，所以`http.ResponseWriter`可以用來當作`io.Writer`使用。`Request`是一種結構，包含了一個已剖析的代表，用來表示來自客戶端的請求。
 
-For brevity, let's ignore POSTs and assume HTTP requests are always GETs; that simplification does not affect the way the handlers are set up. Here's a trivial but complete implementation of a handler to count the number of times the page is visited.
+簡單來說，讓我們先忽略POST方式並假設HTTP的請求一直都是使用GET方式；這樣的簡化不會影響設置控制器(handler)的方式。下列是個瑣碎但是個完整控制器實作，用來計算頁面瀏覽的次數。
 
-    // Simple counter server.
+    // 簡單計數器伺服器。
     type Counter struct {
         n int
     }
 
     func (ctr *Counter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
         ctr.n++
-        fmt.Fprintf(w, "counter = %d\n", ctr.n)
+        fmt.Fprintf(w, "次數 = %d\n", ctr.n)
     }
 
-(Keeping with our theme, note how Fprintf can print to an http.ResponseWriter.) For reference, here's how to attach such a server to a node on the URL tree.
+(注意到`Fprintf`可以輸出到`http.ResponseWriter`) 下述範例供你參考，示範如何將上述範例附加到URL樹中成為其中一個分支點。
 
     import "net/http"
     ...
     ctr := new(Counter)
     http.Handle("/counter", ctr)
 
-But why make Counter a struct? An integer is all that's needed. (The receiver needs to be a pointer so the increment is visible to the caller.)
+但為什麼要讓`Counter`成為一個結構呢？這裡只需要一個數值就可以完成工作。(接收者必須是指標，才能對呼叫者的值進行遞增。)
 
-    // Simpler counter server.
+    // 簡單計數器伺服器。
     type Counter int
 
     func (ctr *Counter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -1287,10 +1287,10 @@ But why make Counter a struct? An integer is all that's needed. (The receiver ne
         fmt.Fprintf(w, "counter = %d\n", *ctr)
     }
 
-What if your program has some internal state that needs to be notified that a page has been visited? Tie a channel to the web page.
+如果你希望在程式有一些內部狀態，當一個頁面被瀏覽時能夠收到通知？綁定一個頻道(channel)到網頁。
 
-    // A channel that sends a notification on each visit.
-    // (Probably want the channel to be buffered.)
+    // 每次瀏覽時，發送一個通知到頻道。
+    // (或許希望頻道有緩衝。)
     type Chan chan *http.Request
 
     func (ch Chan) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -1298,41 +1298,40 @@ What if your program has some internal state that needs to be notified that a pa
         fmt.Fprint(w, "notification sent")
     }
 
-Finally, let's say we wanted to present on /args the arguments used when invoking the server binary. It's easy to write a function to print the arguments.
+最後，假設我們希望能夠在調用二進制的伺服器時，將參數(arguments)呈現於`/args`。寫個函式印出參數很容易。
 
     func ArgServer() {
         fmt.Println(os.Args)
     }
 
-How do we turn that into an HTTP server? We could make ArgServer a method of some type whose value we ignore, but there's a cleaner way. Since we can define a method for any type except pointers and interfaces, we can write a method for a function. The http package contains this code:
+那我們要怎麼將他變成一個HTTP伺服器呢？我們可以將`ArgServer`變成某個型別的方法，忽略其值，但這裡有更乾淨的作法。除了指標及介面之外，我們可以對任何型別定義方法，所以我們可以為函式寫一個方法。`http`包裡包含以下程式碼：
 
-    // The HandlerFunc type is an adapter to allow the use of
-    // ordinary functions as HTTP handlers.  If f is a function
-    // with the appropriate signature, HandlerFunc(f) is a
-    // Handler object that calls f.
+    // HandlerFunc 型別是一種轉接器，讓我們可以使用一般的函式來作為HTTP的控制器。
+    // 如果 f 是一個函式，而且是適當的標記式(singature)，HandlerFunc(f)　就是一個控制器的物件，
+    // 其物件會呼叫f函式。
     type HandlerFunc func(ResponseWriter, *Request)
 
-    // ServeHTTP calls f(c, req).
+    // ServeHTTP 呼叫 f(c, req).
     func (f HandlerFunc) ServeHTTP(w ResponseWriter, req *Request) {
         f(w, req)
     }
 
-HandlerFunc is a type with a method, ServeHTTP, so values of that type can serve HTTP requests. Look at the implementation of the method: the receiver is a function, f, and the method calls f. That may seem odd but it's not that different from, say, the receiver being a channel and the method sending on the channel.
+`HandlerFunc`是一種型別，帶有`ServeHTTP`方法，所以該型別的值可以服務HTTP的請求。看看方法的實作：接收者是個函式，名稱為`f`，方法內呼叫`f`。這可能看起來怪怪的，但它跟方法接收者是個頻道，在方法內傳送頻道，沒有什麼差異。
 
-To make ArgServer into an HTTP server, we first modify it to have the right signature.
+為了讓`ArgServer`變成HTTP伺服器，首先修改函式，讓它的標記式符合。
 
-    // Argument server.
+    // 參數伺服器。
     func ArgServer(w http.ResponseWriter, req *http.Request) {
         fmt.Fprintln(w, os.Args)
     }
 
-ArgServer now has same signature as HandlerFunc, so it can be converted to that type to access its methods, just as we converted Sequence to IntSlice to access IntSlice.Sort. The code to set it up is concise:
+現在`ArgServer`的標記式與`HandlerFunc`相同，所以可以轉換成`HandlerFunc`以存取該方法，就如同我們轉換`Sequence`到`IntSlice`以存取`IntSlice.Sort`方法一樣。如下程式碼，十分簡潔：
 
     http.Handle("/args", http.HandlerFunc(ArgServer))
 
-When someone visits the page /args, the handler installed at that page has value ArgServer and type HandlerFunc. The HTTP server will invoke the method ServeHTTP of that type, with ArgServer as the receiver, which will in turn call ArgServer (via the invocation f(c, req) inside HandlerFunc.ServeHTTP). The arguments will then be displayed.
+當有人瀏覽了 `/args`　頁面，安裝在頁面的控制器有`ArgServer`的值及`HandlerFunc`型別。HTTP伺服器將調用該型別的`ServeHTTP`方法，而`ArgServer`為接收者，該方法接著會呼叫`ArgServer`函式 (位於`HandlerFunc.ServeHTTP`內，透過`f(c, req)`的調用)。參數將會顯示出來。
 
-In this section we have made an HTTP server from a struct, an integer, a channel, and a function, all because interfaces are just sets of methods, which can be defined for (almost) any type.
+這個章節中，我們建立了各種HTTP伺服器，包括結構、整數、頻道及函式，因為(幾乎)任何型別都可以定義該介面方法。
 
 ##The blank identifier
 
@@ -1402,7 +1401,7 @@ To silence complaints about the unused imports, use a blank identifier to refer 
         _ = fd
     }
 
-By convention, the global declarations to silence import errors should come right after the imports and be commented, both to make them easy to find and as a reminder to clean things up later. 
+By convention, the global declarations to silence import errors should come right after the imports and be commented, both to make them easy to find and as a reminder to clean things up later.
 
 ###Import for side effect
 
@@ -2032,7 +2031,7 @@ The two snippets {{.}} say to show the data presented to the template—the quer
 
 The rest of the template string is just the HTML to show when the page loads. If this is too quick an explanation, see the documentation for the template package for a more thorough discussion.
 
-And there you have it: a useful web server in a few lines of code plus some data-driven HTML text. Go is powerful enough to make a lot happen in a few lines. 
+And there you have it: a useful web server in a few lines of code plus some data-driven HTML text. Go is powerful enough to make a lot happen in a few lines.
 
 ---
 
